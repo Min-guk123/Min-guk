@@ -101,6 +101,42 @@ table.heat td:hover { outline: 1px solid var(--fg2); }
 .stat div { font-size: 12px; color: var(--muted); }
 .stat b { display: block; font-size: 20px; color: var(--fg); font-variant-numeric: tabular-nums; font-weight: 600; }
 .err { background: #2a1d1d; border: 1px solid #5c2b2b; color: #ffc9c9; padding: 12px 16px; border-radius: 8px; }
+/* ④ 시그널·숏 비중 */
+.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); gap: 12px; max-width: 1200px; margin-bottom: 16px; }
+.vcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.vcard .q { font-size: 12px; color: var(--muted); }
+.vcard .a { font-size: 19px; font-weight: 700; margin: 2px 0 6px; }
+.vcard .a.bad { color: var(--pos); } .vcard .a.good { color: var(--ok); } .vcard .a.mid { color: var(--note); }
+.vcard p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.75; }
+.vcard p b { color: var(--fg2); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--card); color: var(--muted); border: 0; border-right: 1px solid var(--line2); padding: 7px 14px; cursor: pointer; font-family: inherit; font-size: 13px; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: var(--bg); font-weight: 700; }
+.sgnow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; align-items: start; }
+.sgnow > div, .bars3 > div, .verdicts > .vcard { min-width: 0; }
+.big { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.big small { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.kv { display: flex; gap: 10px 26px; flex-wrap: wrap; margin: 8px 0; font-size: 12px; color: var(--muted); }
+.kv b { display: block; font-size: 16px; color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+table.plain { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+table.plain th, table.plain td { padding: 6px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+table.plain th { color: var(--muted); font-weight: normal; font-size: 12px; }
+table.plain .l { text-align: left; }
+table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
+.tscroll { overflow-x: auto; }
+.sig { color: var(--accent); font-weight: 700; }
+.good { color: var(--ok); } .warn { color: var(--note); } .bad { color: var(--pos); }
+.zbar { display: inline-block; width: 90px; height: 8px; background: var(--line); border-radius: 4px; position: relative; vertical-align: middle; }
+.zbar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.bars3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 14px; }
+.bars3 h4 { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--fg2); }
+.range { display: inline-flex; gap: 4px; margin-bottom: 6px; }
+.range button { background: var(--card); border: 1px solid var(--line2); color: var(--muted); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; font-family: inherit; }
+.range button.on { border-color: var(--accent); color: var(--accent); }
+.caveat { background: var(--card); border-left: 3px solid var(--note); border-radius: 6px; padding: 10px 14px; font-size: 12px; color: var(--muted); line-height: 1.8; margin: 8px 0; }
+.caveat b { color: var(--note); }
+.hmc td { text-align: center; min-width: 74px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -126,6 +162,7 @@ table.heat td:hover { outline: 1px solid var(--fg2); }
   <button data-tab="t1" class="on" id="tabBtn1">① 섹터 상대강도 순위</button>
   <button data-tab="t2" id="tabBtn2">② 종목 상대강도 순위</button>
   <button data-tab="t3" id="tabBtn3">③ 수급 확산</button>
+  <button data-tab="t4" id="tabBtn4">④ 시그널·숏 비중</button>
   <a class="dl" href="downloads/kosdaq_rs_latest.xlsx">엑셀 받기 (3시트)</a>
 </div>
 
@@ -198,6 +235,21 @@ table.heat td:hover { outline: 1px solid var(--fg2); }
       </div>
       <div class="heat-wrap"><table class="heat" id="heat"></table></div>
     </div>
+  </div>
+</section>
+
+<section class="tab" id="t4" hidden>
+  <div id="sigState" class="note">시그널 데이터를 불러오는 중…</div>
+  <div id="sgVerdict" class="verdicts"></div>
+  <div class="grid2">
+    <div class="panel" id="sgNow"></div>
+    <div class="panel" id="sgChart"></div>
+    <div class="panel" id="sgQuint"></div>
+    <div class="panel" id="sgSim"></div>
+    <div class="panel" id="sgIC"></div>
+    <div class="panel" id="sgReg"></div>
+    <div class="panel" id="sgAdr"></div>
+    <div class="panel" id="sgMethod"></div>
   </div>
 </section>
 
@@ -278,17 +330,18 @@ function init(data) {
 
   document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
   const hash = (location.hash || "").replace("#", "");
-  showTab(["t1", "t2", "t3"].includes(hash) ? hash : (store("tab") || "t1"));
+  showTab(["t1", "t2", "t3", "t4"].includes(hash) ? hash : (store("tab") || "t1"));
   rebuildSort();
   renderAll();
 }
 
 function showTab(t) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
-  ["t1", "t2", "t3"].forEach((id) => { $(id).hidden = id !== t; });
-  $("perBar").hidden = t === "t3";
+  ["t1", "t2", "t3", "t4"].forEach((id) => { $(id).hidden = id !== t; });
+  $("perBar").hidden = t === "t3" || t === "t4";
   store("tab", t);
   if (t === "t3") renderBreadth();
+  if (t === "t4") renderSignal();
 }
 const ks = () => H.map((_, k) => k).filter((k) => sel[k]);
 function renderAll() { renderSectors(); renderStocks(); }
@@ -515,6 +568,311 @@ function renderHeat() {
     tip.textContent = ""; td.dataset.t.split("\n").forEach((line, j) => { const dv = document.createElement("div"); if (j === 0) dv.className = "mk"; dv.textContent = line; tip.appendChild(dv); });
     tip.hidden = false; tip.style.left = ev.clientX + window.scrollX + 14 + "px"; tip.style.top = ev.clientY + window.scrollY - 10 + "px"; };
   t.onpointerleave = () => { tip.hidden = true; };
+}
+
+/* ---------- ④ 시그널·숏 비중 ---------- */
+let SG = null, RS = null, sgLoading = false, sgBase = store("sgBase") || "중립", sgRange = store("sgRange") || "all", sgPeriod = "all";
+const QL = ["하위 20%", "20~40%", "40~60%", "60~80%", "상위 20%"];
+const QC = ["#ff922b", "#ffc078", "#868e96", "#69db7c", "#38d9a9"];
+const pp = (v, d = 1) => v == null ? "-" : (v * 100).toFixed(d) + "%";
+const spp = (v, d = 1) => v == null ? "-" : (v > 0 ? "+" : "") + (v * 100).toFixed(d) + "%p";
+const sn = (v, d = 2) => v == null ? "-" : (v > 0 ? "+" : "") + v.toFixed(d);
+const pvf = (p) => p == null ? "-" : p < 0.001 ? "&lt;0.001" : p.toFixed(3);
+const pcls = (p) => p != null && p < 0.05 ? "sig" : "";
+
+function renderSignal() {
+  if (SG || sgLoading) return;
+  sgLoading = true;
+  const get = (u) => fetch(u, { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(u + " " + r.status); return r.json(); });
+  Promise.all([get("data/signal.json"), get("data/signal_research.json")])
+    .then(([a, b]) => { SG = a; RS = b; buildSignal(); })
+    .catch((e) => { sgLoading = false; $("sigState").innerHTML = `<div class="err">시그널 데이터를 읽지 못했습니다 (${esc(e.message)}). 저장소에 data/feature_history.csv 와 docs/data/signal.json, signal_research.json 이 있는지 확인하세요.</div>`; });
+}
+
+function buildSignal() {
+  $("sigState").innerHTML = `시그널 기준일 <b>${esc(SG.asof)}</b> · 생성 ${esc(SG.generated)} · 지표 이력 ${esc(SG.history[0])} ~ ${esc(SG.history[1])} · 평가 ${SG.dates.length.toLocaleString()}거래일 · 종목 ${SG.n_stocks.toLocaleString()}개`
+    + (SG.asof !== D.asof ? ` · <span class="warn">종목·섹터 탭 기준일(${esc(D.asof)})보다 최신 일봉이 반영돼 있습니다</span>` : "");
+  secVerdict(); secNow(); secChart(); secQuint(); secSim(); secIC(); secReg(); secAdr(); secMethod();
+}
+const wFor = (base, p) => Math.min(SG.params.hi, Math.max(SG.params.lo, base + SG.params.amp * (1 - 2 * p)));
+const ampT = (a) => pp(a, 1).replace(".0%", "%");
+function setBase(b) { sgBase = b; store("sgBase", b); secNow(); secChart(); secSim(); }
+function segHtml(id) {
+  return `<div class="seg" id="${id}" role="group" aria-label="밸류에이션 판단">` + Object.entries(SG.params.bases).map(([k, v]) =>
+    `<button data-b="${esc(k)}" class="${k === sgBase ? "on" : ""}" title="기준 숏 비중 ${pp(v, 0)}">${esc(k)} ${pp(v, 0)}</button>`).join("") + "</div>";
+}
+function bindSeg(id) { $(id).querySelectorAll("button").forEach((b) => { b.onclick = () => setBase(b.dataset.b); }); }
+
+function yearStats(base) {
+  const ys = SG.bases[base].yearly, df = ys.map((y) => ({ y: y.year, d: y.sig - y.static }));
+  const best = df.reduce((a, b) => (b.d > a.d ? b : a)), tot = df.reduce((s, o) => s + o.d, 0);
+  return { n: df.length, wins: df.filter((o) => o.d > 0).length, best, restAvg: df.length > 1 ? (tot - best.d) / (df.length - 1) : null };
+}
+function secVerdict() {
+  const cc = RS.composite_ic, q = RS.quintiles.all, f = RS.fund.stats, rg = RS.regression, d = (v) => (v == null ? "-" : sn(v, 3)), ys = yearStats("중립");
+  const nsig = RS.ic.filter((r) => ["fwd5", "fwd20", "fwd60"].some((k) => r[k].p < 0.05)).length;
+  $("sgVerdict").innerHTML = `
+  <div class="vcard"><div class="q">① 코스닥이 오를지 내릴지 (방향)</div><div class="a bad">못 맞힙니다</div>
+    <p>지표를 모두 평균해도 이후 5·20·60일 수익률과의 상관(IC)은 <b>${d(cc.fwd5.ic)} / ${d(cc.fwd20.ic)} / ${d(cc.fwd60.ic)}</b>로 사실상 0입니다(20일 p=${pvf(cc.fwd20.p)}). 개별 지표 ${RS.ic.length}개 중 ${nsig === 0 ? "방향을 유의하게 맞힌 것은 없습니다." : `p&lt;0.05인 것은 ${nsig}개뿐입니다.`}</p></div>
+  <div class="vcard"><div class="q">② 앞으로 얼마나 흔들릴지 (위험)</div><div class="a good">구분합니다</div>
+    <p>점수 하위 20%일 때 이후 20일 최대낙폭 평균 <b>${pp(q[0].fmdd20)}</b>, 상위 20%일 때 <b>${pp(q[4].fmdd20)}</b>. 변동성은 ${pp(q[0].fvol20, 0)} 대 ${pp(q[4].fvol20, 0)}입니다. 최근 변동성을 통제해도 남고(t=${sn(rg.fvol20.all.breadth_t, 1)}) 전반·후반 모두 같은 방향입니다.</p></div>
+  <div class="vcard"><div class="q">③ 숏 비중 조절에 쓰면</div><div class="a mid">작은 보험, 근거는 약함</div>
+    <p>밸류에이션 기준 숏 비중에 ±${ampT(RS.fund.amp)}p 가감하면 순노출 손익의 최대낙폭이 <b>${pp(f.static_mdd)} → ${pp(f.mdd)}</b>(p=${pvf(RS.fund.p_d_mdd)}, ${RS.fund.p_d_mdd < 0.05 ? "유의" : RS.fund.p_d_mdd < 0.1 ? "경계선" : "유의하지 않음"}). Sharpe 개선은 ${sn(f.d_sharpe, 3)}로 유의하지 않습니다(p=${pvf(RS.fund.p_d_sharpe)}). 연도별로는 ${ys.n}년 중 ${ys.wins}년만 고정 숏보다 나았고, 가장 좋았던 해(${ys.best.y}년 ${spp(ys.best.d)})를 빼면 나머지는 연평균 ${spp(ys.restAvg, 2)}입니다. <b>급락 때 얻고 평소에 조금 잃는 보험</b>에 가깝습니다.</p></div>`;
+}
+
+function gaugeSvg(score) {
+  const W = 560, Hh = 66, L = 8, R = 8, bw = W - L - R, y = 24, h = 14;
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="낙관 점수 ${score.toFixed(0)}점">`;
+  for (let i = 0; i < 5; i++) s += `<rect x="${(L + bw * i / 5).toFixed(1)}" y="${y}" width="${(bw / 5 - 2).toFixed(1)}" height="${h}" rx="3" fill="${QC[i]}" opacity=".85"/>`;
+  [0, 20, 40, 60, 80, 100].forEach((t) => { s += `<text x="${L + bw * t / 100}" y="${y + h + 15}" text-anchor="middle">${t}</text>`; });
+  const mx = L + bw * score / 100;
+  s += `<path d="M${mx - 7} ${y - 5} L${mx + 7} ${y - 5} L${mx} ${y + 5} Z" fill="var(--fg)"/>`;
+  s += `<text x="${mx}" y="${y - 9}" text-anchor="middle" style="fill:var(--fg);font-weight:700;font-size:12px">${score.toFixed(0)}</text></svg>`;
+  return s;
+}
+function fmtFeat(k, v) {
+  if (v == null) return "-";
+  if (k.startsWith("adr")) return (100 * Math.exp(v)).toFixed(0);
+  if (k.startsWith("ews")) return sn(v * 100, 1) + "%p";
+  return (v * 100).toFixed(1) + "%";
+}
+function secNow() {
+  const N = SG.now, P = SG.params, cur = N.bases[sgBase];
+  const dScore = N.pbull_prev_week == null ? null : N.score - N.pbull_prev_week * 100;
+  const bandTxt = ["약함", "다소 약함", "보통", "다소 강함", "강함"][N.band];
+  const dW = cur.w_prev_week == null ? null : cur.w - cur.w_prev_week;
+  const rule = [0.1, 0.3, 0.5, 0.7, 0.9].map((p, i) => `<tr${i === N.band ? ' class="hl"' : ""}><td class="l"><span class="sq" style="background:${QC[i]}"></span> ${QL[i]}</td>`
+    + Object.values(P.bases).map((b) => `<td>${pp(wFor(b, p), 0)}</td>`).join("") + "</tr>").join("");
+  const comps = N.components.map((c) => { const z = c.z; const w = z == null ? 0 : Math.abs(z) / 3 * 50, l = z == null ? 50 : z >= 0 ? 50 : 50 - w;
+    return `<tr><td class="l">${esc(c.label)}</td><td>${fmtFeat(c.key, c.value)}</td><td>${z == null ? "-" : sn(z, 1)}</td><td>${c.pct == null ? "-" : (c.pct * 100).toFixed(0)}</td>`
+      + `<td><span class="zbar"><i style="left:${l}%;width:${w}%;background:${z != null && z >= 0 ? "var(--ok)" : "var(--note)"}"></i></span></td></tr>`; }).join("");
+  $("sgNow").innerHTML = `
+    <h3>현재 상태와 권장 숏 비중</h3>
+    <p class="desc">수급 확산 지표 ${P.n_features}개를 평균해 '낙관 점수'(0~100, 지금까지의 역사에서 몇 % 위치인가)로 만들었습니다. 낮을수록 시장이 좁고 약해서 앞으로 흔들릴 위험이 큰 상태입니다. 이 점수는 <b>오를지 내릴지가 아니라 위험</b>을 알려줍니다.</p>
+    <div class="sgnow"><div>
+      <div class="chart">${gaugeSvg(N.score)}</div>
+      <div class="kv"><div>낙관 점수<b>${N.score.toFixed(0)} · ${bandTxt}</b></div><div>1주 전 대비<b>${dScore == null ? "-" : sn(dScore, 0) + "점"}</b></div>
+        <div>코스닥 ADR 20일<b>${N.adr20.toFixed(0)}</b></div><div>코스닥 1주<b>${sgn(N.kosdaq_chg_1w, 1)}</b></div></div>
+      <div class="filters"><span>시장 밸류에이션 판단</span>${segHtml("sgSeg1")}</div>
+      <div class="big">${pp(cur.w, 0)}<small>권장 숏 비중 (순노출 ${pp(1 - cur.w, 0)})</small></div>
+      <div class="kv"><div>오늘 점수만 반영<b>${pp(cur.w_raw, 0)}</b></div><div>1주 전 권장<b>${pp(cur.w_prev_week, 0)}</b></div><div>1주 변화<b>${dW == null ? "-" : spp(dW, 0)}</b></div></div>
+      <p class="note">권장 숏 비중은 점수를 10일 지수이동평균으로 평활한 값(과거 성과도 이 값 기준)입니다. 점수가 급변하면 '오늘 점수만 반영' 값이 먼저 움직이고 권장 값은 며칠에 걸쳐 따라갑니다. 밸류에이션 판단(저평가·중립·고평가)은 기존 룰대로 직접 고르세요. 이 탭은 그 위에서 ±${ampT(P.amp)}p 가감만 합니다.</p>
+    </div><div>
+      <h3 style="margin-top:0">점수 구간별 숏 비중 (평활 전 기준)</h3>
+      <div class="tscroll"><table class="plain"><thead><tr><th class="l">낙관 점수</th>${Object.entries(P.bases).map(([k, v]) => `<th>${esc(k)} ${pp(v, 0)}</th>`).join("")}</tr></thead><tbody>${rule}</tbody></table></div>
+      <p class="note">공식: 기준 숏 비중 + ${pp(P.amp, 1).replace(".0%", "%")}p × (1 − 2 × 점수), ${pp(P.lo, 0)}~${pp(P.hi, 0)} 한도. 예) 중립 75%에서 점수 10이면 ${pp(wFor(0.75, 0.1), 1)}, 90이면 ${pp(wFor(0.75, 0.9), 1)}. 가감 폭은 작게 잡았습니다(아래 '숏 비중 가감의 과거 효과' 참고).</p>
+      <h3 style="margin-top:14px">지표별 현재 상태</h3>
+      <div class="tscroll"><table class="plain"><thead><tr><th class="l">지표</th><th>현재 값</th><th>표준화</th><th>백분위</th><th></th></tr></thead><tbody>${comps}</tbody></table></div>
+      <p class="note">표준화 = (현재 값 − 지금까지 평균) ÷ 표준편차, 0보다 크면 평소보다 넓게 오르는 중입니다. 백분위 = 지금까지 역사 중 위치(0~100). 이 16개를 단순 평균한 것이 낙관 점수입니다. ADR = 최근 N일 상승종목 누적 ÷ 하락종목 누적 × 100.</p>
+    </div></div>`;
+  bindSeg("sgSeg1");
+}
+
+/* 여러 패널을 한 x축에 겹쳐 그리는 시계열 차트 */
+function tsChart(el, dates, panels, o) {
+  const W = 1000, L = 52, R = 14, gap = 12, T0 = 6, AX = 24, n = dates.length;
+  const x = (i) => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
+  let yy = T0; const G = panels.map((p) => { const g = { y0: yy, y1: yy + p.h }; yy += p.h + gap; return g; });
+  const Hh = yy - gap + AX;
+  const ym = (p, g, v) => { const a = p.log ? Math.log(v) : v, lo = p.log ? Math.log(p.min) : p.min, hi = p.log ? Math.log(p.max) : p.max; return g.y1 - (g.y1 - g.y0) * (a - lo) / (hi - lo); };
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(o.label || "시계열 차트")}">`;
+  (o.shade || []).forEach((r) => { s += `<rect x="${x(r.a).toFixed(1)}" width="${Math.max(1, x(r.b) - x(r.a)).toFixed(1)}" y="${T0}" height="${Hh - AX - T0}" fill="${r.c}"/>`; });
+  panels.forEach((p, k) => {
+    const g = G[k];
+    p.ticks.forEach((t) => { const yv = ym(p, g, t); s += `<line x1="${L}" x2="${W - R}" y1="${yv.toFixed(1)}" y2="${yv.toFixed(1)}" stroke="var(--line)"/><text x="${L - 8}" y="${(yv + 4).toFixed(1)}" text-anchor="end">${p.fmt(t)}</text>`; });
+    (p.hlines || []).forEach((h) => { const yv = ym(p, g, h.y); s += `<line x1="${L}" x2="${W - R}" y1="${yv.toFixed(1)}" y2="${yv.toFixed(1)}" stroke="${h.c || "var(--dim)"}" stroke-dasharray="4 4"/>`; });
+    p.series.forEach((q) => { const pts = []; q.v.forEach((v, i) => { if (v != null) pts.push(`${x(i).toFixed(1)},${ym(p, g, v).toFixed(1)}`); });
+      s += `<polyline fill="none" stroke="${q.c}" stroke-width="${q.w || 1.6}" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(" ")}"/>`; });
+    s += `<text x="${L + 6}" y="${g.y0 + 12}" style="fill:var(--fg2);font-weight:600">${esc(p.title)}</text>`;
+  });
+  let last = "";
+  dates.forEach((d, i) => { const key = n <= 520 ? d.slice(0, 7) : d.slice(0, 4);
+    if (key !== last) { last = key; if (n > 520 || i > 4 || i === 0) s += `<text x="${x(i).toFixed(1)}" y="${Hh - 6}" text-anchor="${i === 0 ? "start" : "middle"}">${n <= 520 ? key.slice(2).replace("-", ".") : key.slice(2)}</text>`; } });
+  s += `<line class="xh" x1="0" x2="0" y1="${T0}" y2="${Hh - AX}" stroke="var(--fg2)" stroke-width="1" visibility="hidden"/><rect class="hit" x="${L}" y="${T0}" width="${W - L - R}" height="${Hh - AX - T0}" fill="transparent"/></svg>`;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg"), xh = svg.querySelector(".xh"), tip = $("tip"), hit = svg.querySelector(".hit");
+  hit.addEventListener("pointermove", (ev) => {
+    const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) / rc.width * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - L) / (W - L - R) * (n - 1))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div class="mk">${esc(dates[i])}</div>` + o.tip(i); tip.hidden = false;
+    const tx = ev.clientX + 14, tw = tip.offsetWidth;
+    tip.style.left = (tx + tw > window.innerWidth - 8 ? ev.clientX - tw - 14 : tx) + window.scrollX + "px"; tip.style.top = ev.clientY + window.scrollY - 10 + "px";
+  });
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); });
+}
+function logTicks(lo, hi) {
+  const c = [300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1500, 2000, 2500, 3000], t = c.filter((v) => v >= lo * 0.97 && v <= hi * 1.03);
+  return t.length > 6 ? t.filter((_, i) => i % 2 === 0) : t;
+}
+const RANGES = [["all", "전체"], ["2520", "10년"], ["1260", "5년"], ["756", "3년"], ["252", "1년"]];
+function rangeHtml(id) { return `<div class="range" id="${id}">` + RANGES.map(([k, l]) => `<button data-r="${k}" class="${k === sgRange ? "on" : ""}">${l}</button>`).join("") + "</div>"; }
+
+function secChart() {
+  const n0 = SG.dates.length, take = sgRange === "all" ? n0 : Math.min(n0, +sgRange), a = n0 - take;
+  const dates = SG.dates.slice(a), kos = SG.kosdaq.slice(a), pb = SG.pbull.slice(a), w = SG.bases[sgBase].w.slice(a);
+  const shade = []; let st = -1, kind = 0;
+  const cls = (v) => v == null ? 0 : v < 0.2 ? 1 : v > 0.8 ? 2 : 0;
+  pb.forEach((v, i) => { const c = cls(v); if (c !== kind) { if (kind) shade.push({ a: st, b: i, c: kind === 1 ? "rgba(255,146,43,.17)" : "rgba(56,217,169,.10)" }); kind = c; st = i; } });
+  if (kind) shade.push({ a: st, b: pb.length - 1, c: kind === 1 ? "rgba(255,146,43,.17)" : "rgba(56,217,169,.10)" });
+  const lo = Math.min(...kos), hi = Math.max(...kos);
+  $("sgChart").innerHTML = `<h3>수급 확산 종합 점수와 코스닥 (${esc(SG.dates[0].slice(0, 4))}년~)</h3>
+    <p class="desc">위: 코스닥 지수(로그 눈금). 가운데: 낙관 점수. 아래: 권장 숏 비중. 주황 음영은 점수가 하위 20%(위험 구간), 초록 음영은 상위 20%(넓게 오르는 구간)였던 날입니다. 주황 구간에서 지수가 더 깊게 흔들리는 경향은 있지만, 그 뒤에 반등하는 경우도 많아서 <b>방향 신호는 아닙니다</b>.</p>
+    <div class="filters">${rangeHtml("sgRange")}<span>숏 비중 기준</span>${segHtml("sgSeg2")}</div>
+    <div class="legend"><span><span class="sq" style="background:rgba(255,146,43,.45)"></span> 점수 하위 20%</span><span><span class="sq" style="background:rgba(56,217,169,.35)"></span> 점수 상위 20%</span></div>
+    <div class="chart" id="chSg"></div>`;
+  tsChart($("chSg"), dates, [
+    { title: "코스닥 지수", h: 170, log: true, min: lo * 0.96, max: hi * 1.04, ticks: logTicks(lo, hi), fmt: (v) => v.toLocaleString("ko-KR"), series: [{ v: kos, c: "var(--idx)", w: 1.6 }] },
+    { title: "낙관 점수 (0~100)", h: 100, min: 0, max: 100, ticks: [0, 20, 50, 80, 100], fmt: (v) => v, hlines: [{ y: 20, c: "#ff922b" }, { y: 80, c: "#38d9a9" }], series: [{ v: pb.map((v) => v == null ? null : v * 100), c: "var(--accent)", w: 1.5 }] },
+    { title: `권장 숏 비중 (${sgBase} ${pp(SG.params.bases[sgBase], 0)} 기준)`, h: 90, min: 0.45, max: 1.05, ticks: [0.5, 0.75, 1], fmt: (v) => pp(v, 0), series: [{ v: w, c: "var(--note)", w: 1.6 }] },
+  ], { label: "코스닥 지수, 낙관 점수, 권장 숏 비중", shade,
+    tip: (i) => `<div><b>${kos[i].toLocaleString("ko-KR")}</b> 코스닥</div><div><b>${pb[i] == null ? "-" : (pb[i] * 100).toFixed(0)}</b> 낙관 점수</div><div><b>${pp(w[i], 0)}</b> 권장 숏 비중</div>` });
+  $("sgRange").querySelectorAll("button").forEach((b) => { b.onclick = () => { sgRange = b.dataset.r; store("sgRange", sgRange); secChart(); }; });
+  bindSeg("sgSeg2");
+}
+
+function barChart(el, vals, o) {
+  const W = 360, Hh = 196, L = 6, R = 6, T = 22, B = 36, n = vals.length;
+  const lo = Math.min(0, ...vals, o.base ?? 0), hi = Math.max(0, ...vals, o.base ?? 0), pad = (hi - lo) * 0.18 || 1;
+  const a = lo - (lo < 0 ? pad : 0), b = hi + (hi > 0 ? pad : 0);
+  const y = (v) => T + (Hh - T - B) * (1 - (v - a) / (b - a)), bw = (W - L - R) / n;
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(o.label)}">`;
+  s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line2)"/>`;
+  if (o.base != null) s += `<line x1="${L}" x2="${W - R}" y1="${y(o.base)}" y2="${y(o.base)}" stroke="var(--fg2)" stroke-dasharray="4 3"/>`;
+  vals.forEach((v, i) => { const x0 = L + bw * i + bw * 0.16, w = bw * 0.68, y0 = y(0), y1 = y(v), up = v >= 0;
+    s += `<rect x="${x0.toFixed(1)}" y="${Math.min(y0, y1).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(1, Math.abs(y1 - y0)).toFixed(1)}" rx="3" fill="${QC[i]}" opacity=".9"/>`;
+    s += `<text x="${(x0 + w / 2).toFixed(1)}" y="${(up ? y1 - 5 : y1 + 13).toFixed(1)}" text-anchor="middle" style="fill:var(--fg);font-size:12px;font-weight:600">${o.fmt(v)}</text>`;
+    s += `<text x="${(x0 + w / 2).toFixed(1)}" y="${Hh - 16}" text-anchor="middle">${QL[i]}</text>`; });
+  el.innerHTML = s + "</svg>";
+}
+function secQuint() {
+  const R = RS, sp = R.sample.split;
+  const q = R.quintiles[sgPeriod], base = R.quintiles[sgPeriod + "_base"];
+  const lab = { all: "전체 기간", first: `전반(~${sp.slice(0, 7).replace("-", ".")})`, second: `후반(${sp.slice(0, 7).replace("-", ".")}~)` };
+  $("sgQuint").innerHTML = `<h3>점수 구간별로 본 이후 20일 성과</h3>
+    <p class="desc">모든 날을 그날의 낙관 점수 5분위로 나누고, 그 뒤 20거래일의 코스닥을 평균했습니다. <b>낙폭과 변동성은 점수가 낮을수록 계단식으로 커지는데, 수익률은 구간 사이에 일정한 차이가 없습니다.</b> 약한 구간이 곧 하락 신호는 아니라는 뜻입니다.</p>
+    <div class="filters"><div class="seg" id="sgPer">${Object.entries(lab).map(([k, l]) => `<button data-p="${k}" class="${k === sgPeriod ? "on" : ""}">${l}</button>`).join("")}</div></div>
+    <div class="bars3"><div><h4>이후 20일 최대낙폭 <span class="mk">점선 = 전체 평균 ${pp(base.fmdd20)}</span></h4><div class="chart" id="bq1"></div></div><div><h4>이후 20일 변동성(연율) <span class="mk">점선 = 전체 평균 ${pp(base.fvol20, 0)}</span></h4><div class="chart" id="bq2"></div></div><div><h4>이후 20일 수익률 <span class="mk">점선 = 전체 평균 ${pp(base.fwd20)}</span></h4><div class="chart" id="bq3"></div></div></div>
+    <div class="tscroll"><table class="plain" style="margin-top:8px"><thead><tr><th class="l">낙관 점수</th><th>일수</th><th>20일 수익률</th><th>상승한 비율</th><th>20일 최대낙폭</th><th>20일 변동성</th></tr></thead><tbody>`
+    + q.map((r, i) => `<tr><td class="l"><span class="sq" style="background:${QC[i]}"></span> ${QL[i]}</td><td>${r.n.toLocaleString()}</td><td>${sgn(r.fwd20, 2)}</td><td>${pp(r.hit, 0)}</td><td>${pp(r.fmdd20)}</td><td>${pp(r.fvol20, 1)}</td></tr>`).join("")
+    + `<tr><td class="l mk">전체</td><td>${base.n.toLocaleString()}</td><td>${sgn(base.fwd20, 2)}</td><td>${pp(base.hit, 0)}</td><td>${pp(base.fmdd20)}</td><td>${pp(base.fvol20, 1)}</td></tr></tbody></table></div>
+    <p class="note">겹치는 20일 구간이라 일수 ÷ 20 정도가 실제 독립 표본입니다. 최대낙폭 = 그날 종가 대비 이후 20일 중 가장 낮은 종가의 하락률.</p>`;
+  barChart($("bq1"), q.map((r) => r.fmdd20 * 100), { base: base.fmdd20 * 100, fmt: (v) => v.toFixed(1) + "%", label: "점수 구간별 이후 20일 최대낙폭" });
+  barChart($("bq2"), q.map((r) => r.fvol20 * 100), { base: base.fvol20 * 100, fmt: (v) => v.toFixed(0) + "%", label: "점수 구간별 이후 20일 변동성" });
+  barChart($("bq3"), q.map((r) => r.fwd20 * 100), { base: base.fwd20 * 100, fmt: (v) => v.toFixed(1) + "%", label: "점수 구간별 이후 20일 수익률" });
+  $("sgPer").querySelectorAll("button").forEach((b) => { b.onclick = () => { sgPeriod = b.dataset.p; secQuint(); }; });
+}
+
+function secSim() {
+  const B = SG.bases[sgBase], st = B.stats, F = RS.fund, dates = SG.dates, isMid = sgBase === "중립";
+  const row = (name, d, extra) => `<tr><td class="l">${name}</td><td>${sgn(d.ret, 1)}</td><td>${pp(d.vol, 1)}</td><td>${d.sharpe.toFixed(2)}</td><td>${pp(d.mdd, 1)}</td>${extra}</tr>`;
+  const cell = (v, fmt, good) => `<td class="${v == null ? "" : (good(v) ? "good" : "bad")}">${fmt(v)}</td>`;
+  const blocks = F.blocks.map((b) => `<tr><td class="l">${esc(b.label)}</td>${cell(b.d_mdd, (v) => spp(v), (v) => v > 0)}${cell(b.d_sharpe, (v) => sn(v, 3), (v) => v > 0)}<td>${pp(b.mdd, 1)}</td><td>${pp(b.static_mdd, 1)}</td></tr>`).join("");
+  const G = F.grid, hm = (mat, fmt, hl) => `<table class="plain hmc"><thead><tr><th class="l">기준 ↓ 가감 폭 →</th>${G.amps.map((a) => `<th>±${pp(a, 1).replace(".0%", "%")}p</th>`).join("")}</tr></thead><tbody>`
+    + G.bases.map((b, i) => `<tr><td class="l">기준 ${pp(b, 1).replace(".0%", "%")}</td>` + G.amps.map((a, j) => { const v = mat[i][j], m = Math.min(1, Math.abs(v) / hl);
+      const bg = v >= 0 ? `rgba(99,230,190,${(0.08 + m * 0.4).toFixed(2)})` : `rgba(255,135,135,${(0.08 + m * 0.4).toFixed(2)})`;
+      const chosen = Math.abs(b - F.base) < 1e-9 && Math.abs(a - F.amp) < 1e-9;
+      return `<td style="background:${bg};${chosen ? "outline:2px solid var(--accent);outline-offset:-2px;font-weight:700" : ""}">${fmt(v)}</td>`; }).join("") + "</tr>").join("") + "</tbody></table>";
+  const ysx = yearStats(sgBase);
+  const yrows = B.yearly.map((y) => { const d = y.sig - y.static; return `<tr><td class="l">${y.year}${y.partial ? ' <span class="mk">(진행 중)</span>' : ""}</td><td>${sgn(y.idx, 1)}</td><td>${pp(y.w, 0)}</td><td>${sgn(y.sig, 2)}</td><td>${sgn(y.static, 2)}</td><td class="${d > 0 ? "good" : "bad"}">${spp(d, 2)}</td></tr>`; }).join("");
+  const A = RS.amp_table, bestM = A.reduce((a, b) => (b.d_mdd > a.d_mdd ? b : a));
+  const arows = A.map((a) => `<tr${Math.abs(a.amp - F.amp) < 1e-9 ? ' class="hl"' : ""}><td class="l">±${ampT(a.amp)}p</td><td class="${a.d_mdd > 0 ? "good" : "bad"}">${spp(a.d_mdd)}</td><td>${sn(a.d_sharpe, 3)}</td><td>${spp(a.d_ret, 2)}</td><td>${spp(a.best, 1)}</td><td class="${a.mean_ex_best > 0 ? "good" : "bad"}">${spp(a.mean_ex_best, 2)}</td><td>${a.wins}/${a.years}</td><td>${a.turnover.toFixed(1)}회</td></tr>`).join("");
+  const eps = F.episodes.map((e) => `<tr><td class="l">${esc(e.label)}</td><td>${esc(e.from.slice(2))} ~ ${esc(e.to.slice(2))}</td><td>${sgn(e.idx_chg, 1)}</td><td>${pp(e.w_start, 0)}</td><td>${pp(e.w_end, 0)}</td><td>${pp(e.w_mean, 0)}</td></tr>`).join("");
+  $("sgSim").innerHTML = `<h3>숏 비중 가감의 과거 효과 (순노출 부분의 손익)</h3>
+    <p class="desc">롱 북이 코스닥과 같이 움직인다(베타 1)고 보고, 순노출(=100% − 숏 비중) 부분의 손익만 비교했습니다. <b>같은 평균 숏 비중을 계속 유지한 경우</b>와 견줘서 지수가 오르거나 내린 영향은 빠지고 '가감 타이밍'의 효과만 남깁니다. 종목 선택 알파, 인버스 ETF의 추적오차·보수는 포함하지 않았고, 비용은 숏 100%를 바꿀 때 ${(SG.params.cost * 1e4).toFixed(0)}bp입니다.</p>
+    <div class="filters"><span>숏 비중 기준</span>${segHtml("sgSeg3")}</div>
+    <div class="legend"><span><span class="ln" style="background:var(--accent)"></span> 점수로 가감 (평균 숏 ${pp(st.w_mean, 0)})</span><span><span class="ln" style="background:var(--dim)"></span> 같은 평균 숏 고정</span></div>
+    <div class="chart" id="chSim"></div>
+    <div class="tscroll"><table class="plain" style="margin-top:8px"><thead><tr><th class="l">${esc(sgBase)} 기준</th><th>연 수익률</th><th>변동성</th><th>Sharpe</th><th>최대낙폭</th><th>연 회전</th></tr></thead><tbody>
+      ${row("점수로 가감", st.sig, `<td>${st.turnover.toFixed(1)}회</td>`)}${row("같은 평균 숏 고정", st.static, "<td>-</td>")}</tbody></table></div>
+    <div class="kv"><div>최대낙폭 개선<b class="${st.d_mdd > 0 ? "good" : "bad"}">${spp(st.d_mdd)}</b></div><div>Sharpe 차이<b class="${st.d_sharpe > 0 ? "good" : "bad"}">${sn(st.d_sharpe, 3)}</b></div>
+      ${isMid ? `<div>유의확률(최대낙폭)<b>${pvf(F.p_d_mdd)}</b></div><div>유의확률(Sharpe)<b>${pvf(F.p_d_sharpe)}</b></div>` : `<div>유의확률<b class="mk">중립 기준으로만 검정</b></div>`}</div>
+    <p class="note">유의확률 = 같은 점수 열을 시간축에서 임의로 밀어 넣었을 때 우연히 이만큼 좋아질 확률(순환 이동 검정, 1,500회). 0.05보다 작으면 우연이라 보기 어렵습니다. 단, 여러 변형을 본 뒤 고른 규칙이라 다중비교는 반영되지 않았습니다.</p>
+    <h3 style="margin-top:14px">연도별로 보면 (${esc(sgBase)} 기준)</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">연도</th><th>코스닥</th><th>평균 숏</th><th>점수로 가감</th><th>같은 평균 숏 고정</th><th>차이</th></tr></thead><tbody>${yrows}</tbody></table></div>
+    <p class="note">${ysx.n}년 중 <b>${ysx.wins}년만</b> 고정 숏보다 나았습니다. 가장 좋았던 해(${ysx.best.y}년 ${spp(ysx.best.d, 2)})를 빼면 나머지 해는 연평균 ${spp(ysx.restAvg, 2)}입니다. 급락이 있던 해에 보호가 되고 강세가 이어진 해에는 조금 손해를 보는 구조입니다. 롱 100% + 지수 숏 구조라면 이 손익은 NAV 대비 %로 읽으시면 됩니다.</p>
+    <h3 style="margin-top:14px">구간별로 일관적인가 (중립 75% ±${ampT(F.amp)}p)</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">구간</th><th>최대낙폭 개선</th><th>Sharpe 차이</th><th>최대낙폭(가감)</th><th>최대낙폭(고정)</th></tr></thead><tbody>${blocks}</tbody></table></div>
+    <p class="note">최대낙폭은 ${F.blocks.length}개 구간 중 ${F.blocks.filter((b) => b.d_mdd > 0).length}개에서 개선됐지만, Sharpe는 ${F.blocks.filter((b) => b.d_sharpe < 0).map((b) => esc(b.label)).join("·") || "모든 구간"}에서 오히려 나빠졌습니다. 개선 폭이 구간마다 크게 다르다는 점을 감안하세요.</p>
+    <h3 style="margin-top:14px">가감 폭은 얼마가 적당한가 (중립 75% 기준, 평활 ${F.smooth}일)</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">가감 폭</th><th>최대낙폭 개선</th><th>Sharpe 차이</th><th>연평균 초과수익</th><th>가장 좋은 해</th><th>그 해를 뺀 연평균</th><th>이득 본 해</th><th>연 회전</th></tr></thead><tbody>${arows}</tbody></table></div>
+    <p class="note">가감 폭을 키울수록 최대낙폭 개선은 ±${ampT(bestM.amp)}p까지 커지지만(한도 50~100%에 닿으면 더 늘려도 줄어듭니다), 가장 좋은 해를 뺀 연평균 손익, 즉 평소에 치르는 비용도 같이 나빠집니다. 개선 대비 비용이 좋은 현재 설정(±${ampT(F.amp)}p)을 기본값으로 했습니다. 더 강한 방어를 원하면 <code>config/signal_params.json</code>의 <code>amp</code>를 키우세요(예: 0.25). 비용이 늘면 이득이 사라집니다(Sharpe 차이: ${F.cost_sens.map((c) => `${c.cost_bp.toFixed(0)}bp ${sn(c.d_sharpe, 3)}`).join(" · ")}).</p>
+    <div class="tscroll">${hm(G.d_mdd, (v) => spp(v), 0.06)}</div>
+    <p class="note">위 표의 최대낙폭 개선을 기준(행)과 가감 폭(열)별로 펼친 것입니다. 파란 테두리가 현재 설정입니다. 기준 숏이 높을수록(고평가 100%) 한도 때문에 줄일 수만 있어서 효과가 작아집니다.</p>
+    <h3 style="margin-top:14px">주요 급락 구간의 권장 숏 비중 (중립 기준)</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">구간</th><th>기간</th><th>지수 변화</th><th>시작 숏</th><th>끝 숏</th><th>평균 숏</th></tr></thead><tbody>${eps}</tbody></table></div>`;
+  const d0 = dates, n = d0.length;
+  tsChart($("chSim"), d0, [
+    { title: "누적 손익 (시작=100)", h: 150, log: true, min: Math.min(...B.nav_sig, ...B.nav_static) * 0.97, max: Math.max(...B.nav_sig, ...B.nav_static) * 1.03,
+      ticks: [60, 80, 100, 120, 140, 160, 200].filter((v) => v >= Math.min(...B.nav_sig, ...B.nav_static) * 0.97 && v <= Math.max(...B.nav_sig, ...B.nav_static) * 1.03), fmt: (v) => v,
+      series: [{ v: B.nav_static, c: "var(--dim)", w: 1.5 }, { v: B.nav_sig, c: "var(--accent)", w: 1.8 }] },
+    { title: "낙폭", h: 90, min: Math.min(...B.dd_sig, ...B.dd_static) * 1.1, max: 0, ticks: [0, -0.05, -0.1, -0.15].filter((v) => v >= Math.min(...B.dd_sig, ...B.dd_static) * 1.1), fmt: (v) => pp(v, 0),
+      series: [{ v: B.dd_static, c: "var(--dim)", w: 1.4 }, { v: B.dd_sig, c: "var(--accent)", w: 1.6 }] },
+  ], { label: "점수 가감과 고정 숏의 누적 손익과 낙폭", tip: (i) => `<div><span class="ln" style="background:var(--accent)"></span> 가감 <b>${B.nav_sig[i].toFixed(1)}</b> (낙폭 ${pp(B.dd_sig[i])})</div><div><span class="ln" style="background:var(--dim)"></span> 고정 <b>${B.nav_static[i].toFixed(1)}</b> (낙폭 ${pp(B.dd_static[i])})</div>` });
+  bindSeg("sgSeg3");
+}
+
+function secIC() {
+  const ic = RS.ic, cc = RS.composite_ic, c = (o, good) => `<td class="${pcls(o.p)}">${sn(o.ic, 3)} <span class="mk">${pvf(o.p)}</span></td>`;
+  const rows = ic.map((r) => `<tr><td class="l">${esc(r.label)}</td><td class="l mk">${esc(r.family)}</td>${c(r.fwd20)}${c(r.fwd60)}${c(r.fmdd20)}${c(r.fvol20)}</tr>`).join("")
+    + `<tr class="hl"><td class="l"><b>낙관 점수(16개 평균)</b></td><td class="l mk">채택</td>${c(cc.fwd20)}${c(cc.fwd60)}${c(cc.fmdd20)}${c(cc.fvol20)}</tr>`;
+  const fam = RS.families.map((f) => `<tr${f.name.includes("채택") ? ' class="hl"' : ""}><td class="l">${esc(f.name)}</td><td>${f.n}</td><td class="${f.d_mdd > 0 ? "good" : "bad"}">${spp(f.d_mdd)}</td><td class="${pcls(f.p_mdd)}">${pvf(f.p_mdd)}</td>`
+    + f.blocks_mdd.map((v) => `<td class="${v == null ? "" : v > 0 ? "good" : "bad"}">${spp(v)}</td>`).join("") + "</tr>").join("");
+  $("sgIC").innerHTML = `<h3>어떤 지표가 쓸 만한가</h3>
+    <p class="desc">각 지표가 이후의 무엇과 얼마나 관련 있는지(스피어만 순위상관 IC, 괄호는 유의확률)입니다. 파란 굵은 글씨는 p&lt;0.05. 수익률은 0에 가깝고, <b>낙폭(+가 좋음)과 변동성(−가 좋음)에서만</b> 관련이 나타납니다. 지표 ${ic.length}개×5개 대상을 한꺼번에 본 것이라 우연히 유의해 보이는 칸이 몇 개 섞여 있을 수 있습니다.</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">지표</th><th class="l">지표군</th><th>20일 수익률</th><th>60일 수익률</th><th>20일 최대낙폭</th><th>20일 변동성</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">IC가 +0.1이면 신호가 높은 날이 낮은 날보다 이후 값이 높은 경향이 약하게 있다는 정도입니다(수익률 예측으로는 쓰기 어려운 크기). 최대낙폭은 음수라서 IC가 +이면 '점수가 높을수록 덜 빠짐'입니다.</p>
+    <h3 style="margin-top:14px">지표군별로 따로 써 보면 (같은 숏 규칙, 중립 75% ±${ampT(RS.fund.amp)}p)</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">지표군</th><th>지표 수</th><th>최대낙폭 개선</th><th>유의확률</th>${RS.fund.blocks.map((b) => `<th>${esc(b.label)}</th>`).join("")}</tr></thead><tbody>${fam}</tbody></table></div>
+    <p class="note"><b>③ 탭에서 보시는 '코스닥을 이긴 종목 비율'과 '동일가중−지수 괴리'는 도움이 되지 않았습니다</b>(둘 다 지수와의 상대 비교라서 시장이 넓게 오르는지 내리는지를 담지 못함, 세 구간 모두 낙폭 개선이 0 이하). ADR·이동평균 위 비율·신고가−신저가처럼 지수와 무관하게 넓게 오르는 정도를 보는 지표가 쓸 만했습니다. 다만 결과를 본 뒤 지표를 골라 쓰면 우연에 맞춘 것이 되므로, 선택 없이 16개를 평균하는 방식을 채택했습니다. 이 평균은 어느 한 지표군보다 나쁘지 않았습니다. 바이오 ADR은 제약바이오+주사제 147종목으로 근사한 값이라 선생님의 지정 91종목과 다릅니다.</p>
+    <h3 style="margin-top:14px">단순 추세로 같은 규칙을 쓰면 (중립 75% ±${ampT(RS.fund.amp)}p)</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">점수</th><th>Sharpe 차이</th><th>최대낙폭 개선</th><th>유의확률(최대낙폭)</th></tr></thead><tbody>${RS.trend_cmp.map((t, i) => `<tr${i === 0 ? ' class="hl"' : ""}><td class="l">${esc(t.name)}</td><td class="${t.d_sharpe > 0 ? "good" : "bad"}">${sn(t.d_sharpe, 3)}</td><td class="${t.d_mdd > 0 ? "good" : "bad"}">${spp(t.d_mdd)}</td><td class="${pcls(t.p_mdd)}">${pvf(t.p_mdd)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">'지수가 빠지면 숏을 늘린다'는 단순 추세 규칙은 낙폭 방어가 훨씬 약하고, 수급 확산에서 추세 성분을 걷어내도 방어 효과가 대부분 남습니다. 즉 낙폭 방어는 단순 추세로는 설명되지 않는 정보입니다. 반면 Sharpe는 120일선 이격 같은 단순 추세가 더 낫게 나온 경우도 있어, 수급 확산이 수익 면에서 우월하다고는 말할 수 없습니다.</p>`;
+}
+
+function secReg() {
+  const g = RS.regression, T = (k, lab, good) => `<tr><td class="l">${lab}</td><td>${g[k].all.r2_vol.toFixed(3)}</td><td>${g[k].all.r2_both.toFixed(3)}</td><td class="${Math.abs(g[k].all.breadth_t) > 2 ? "sig" : ""}">${sn(g[k].all.breadth_t, 1)}</td>`
+    + `<td>${sn(g[k].first.breadth_t, 1)} / ${sn(g[k].second.breadth_t, 1)}</td><td>${sn(g[k].oos_r2.vol, 3)} → ${sn(g[k].oos_r2.both, 3)}</td></tr>`;
+  const vt = RS.vol_timing, tr = RS.trend_regime;
+  $("sgReg").innerHTML = `<h3>최근 변동성을 통제해도 남는가</h3>
+    <p class="desc">'지금 변동성이 커서 앞으로도 크다'는 이유만으로 설명되는지 확인했습니다. 이후 20일 값을 [최근 20일 변동성]만으로 설명할 때와 [변동성 + 수급 확산 점수]로 설명할 때를 비교합니다(HAC t값, 표본 외 R²는 750일 학습 후 21일마다 다시 추정).</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">맞히려는 값</th><th>R² 변동성만</th><th>R² +수급확산</th><th>수급확산 t값</th><th>t값 전반/후반</th><th>표본 외 R²</th></tr></thead><tbody>
+      ${T("fvol20", "이후 20일 변동성")}${T("fmdd20", "이후 20일 최대낙폭")}${T("fwd20", "이후 20일 수익률(방향)")}</tbody></table></div>
+    <p class="note">변동성 예측은 수급 확산이 <b>추가로</b> 도움이 됩니다(표본 외 R² ${sn(g.fvol20.oos_r2.vol, 3)} → ${sn(g.fvol20.oos_r2.both, 3)}). 방향(수익률)은 R²가 0이고 표본 외에서는 평균값보다도 못합니다.</p>
+    <div class="caveat"><b>같은 규칙으로 최근 변동성만 보고 숏을 조절하면 오히려 손해였습니다</b>(Sharpe 차이 ${sn(vt.d_sharpe, 3)}, 최대낙폭 ${spp(vt.d_mdd)}). 변동성이 커진 뒤에 반등이 잦았던 영향으로 보입니다. 그래서 '변동성 예측이 된다'는 것과 '그걸로 숏을 조절해 돈이 된다'는 것은 별개입니다. 수급 확산도 이 점은 같아서, 아래 시뮬레이션의 개선 폭은 작습니다.</div>
+    <p class="note">지수가 120일선 아래일 때는 수급 확산이 이후 최대낙폭을 유의하게 설명하고(t=${sn(tr.below.fmdd20.t, 1)}, ${tr.below.n.toLocaleString()}일), 위일 때는 거의 설명하지 못합니다(t=${sn(tr.above.fmdd20.t, 1)}, ${tr.above.n.toLocaleString()}일). 다만 이 조건을 숏 규칙에 넣어 보니 구간별로 오히려 불안정해서 채택하지 않았습니다.</p>`;
+}
+
+function secAdr() {
+  const A = RS.adr_bands;
+  const tb = (rows) => `<table class="plain"><thead><tr><th class="l">20일 ADR</th><th>일수</th><th>이후 20일 수익률</th><th>상승한 비율</th><th>최대낙폭</th><th>변동성</th></tr></thead><tbody>`
+    + rows.map((r) => `<tr><td class="l">${esc(r.band)}</td><td>${r.n.toLocaleString()}</td><td>${sgn(r.fwd20, 2)}</td><td>${pp(r.hit, 0)}</td><td>${pp(r.fmdd20)}</td><td>${pp(r.fvol20, 0)}</td></tr>`).join("") + "</tbody></table>";
+  const lo = A.adr20[0], hiB = A.adr20[3];
+  $("sgAdr").innerHTML = `<h3>ADR 기준선(80 · 100 · 120)으로 보면</h3>
+    <p class="desc">ADR 20일은 '최근 20거래일 상승종목 누적 ÷ 하락종목 누적 × 100'이고, 보통 80 아래를 과매도, 120 위를 과열로 읽습니다. 코스닥 1000종목으로 계산해 구간별 이후 성과를 봤습니다.</p>
+    <div class="tscroll">${tb(A.adr20)}</div>
+    <p class="note"><b>80 아래는 반등 구간이 아니라 이후 낙폭(${pp(lo.fmdd20)})과 변동성(${pp(lo.fvol20, 0)})이 가장 큰 위험 구간</b>이었습니다. 120 위는 과열이라 숏을 늘릴 구간이 아니라 오히려 이후 성과가 가장 좋았습니다(20일 ${sgn(hiB.fwd20, 2)}, 상승 ${pp(hiB.hit, 0)}). 다만 120 위는 ${hiB.n}일(독립 표본 약 ${Math.round(hiB.n / 20)}개)뿐이라 단정하기 어렵습니다.</p>
+    <h3 style="margin-top:12px">바이오 ADR 20일 (제약바이오+주사제 근사)</h3>
+    <div class="tscroll">${tb(A.bio20)}</div>`;
+}
+
+function secMethod() {
+  const S0 = RS.sample, P = SG.params;
+  $("sgMethod").innerHTML = `<h3>방법과 한계</h3>
+    <details class="exp" open><summary>어떻게 만들었나</summary>
+      <b>데이터</b>: 대시보드 시총 상위 1000종목(현재 기준으로 고정)의 일봉(수정주가) ${esc(S0.start)} ~ ${esc(S0.end)}(${S0.days.toLocaleString()}거래일)와 코스닥 지수. 하루에 쓰는 종목은 ${S0.n_stocks_first}개(${esc(S0.start.slice(0, 4))}년)에서 ${S0.n_stocks_last}개(최근)로 늘어납니다.<br>
+      <b>낙관 점수</b>: ADR(5·10·20·40·60일), 코스닥을 이긴 종목 비율(1주·2주·1달·3달), 20·60·120일선 위 종목 비율, 신고가−신저가 비율(60·120일), 동일가중−지수 괴리(1·3달) 16개를 각각 <b>그 날짜까지의 평균·표준편차로만</b> 표준화해(미래 정보 미사용) 단순 평균하고, 지금까지 역사 중 몇 % 위치인지(0~100)로 바꿉니다. 지표를 고르거나 가중치를 맞추지 않은 '평균화'입니다.<br>
+      <b>숏 비중</b>: 밸류에이션이 정한 기준(저평가 50 · 중립 75 · 고평가 100%)에 ${ampT(P.amp)}p × (1 − 2 × 점수)를 더하고 ${pp(P.lo, 0)}~${pp(P.hi, 0)}로 제한한 뒤 ${P.smooth}일 지수이동평균으로 평활합니다. 오늘 신호는 다음 거래일부터 적용합니다.<br>
+      <b>검증</b>: 예측력은 스피어만 상관, 유의확률은 점수 열을 시간축에서 임의로 밀어(순환 이동) 겹치는 구간과 자기상관을 반영한 분포와 비교했습니다. 시뮬레이션은 '같은 평균 숏을 계속 유지'와 견주고 비용을 반영합니다.
+    </details>
+    <div class="caveat"><b>한계</b><br>
+      1) <b>방향은 예측하지 못합니다.</b> 이 점수는 위험 경고등이지 매수·매도 신호가 아닙니다.<br>
+      2) 숏 가감의 개선 폭은 작고(최대낙폭 몇 %p), 2016~2022에는 Sharpe 기준으로 일관되지 않았으며 개선은 2023년 이후에 집중됩니다.<br>
+      3) 유의확률은 여러 지표군·설정을 살펴본 뒤 계산했기 때문에 다중비교를 반영하지 않았습니다. 실제 신뢰도는 표기보다 낮다고 보셔야 합니다.<br>
+      4) <b>생존 편향</b>: 현재 시총 상위 1000종목만 쓰므로 과거 구간은 살아남은 종목 위주입니다(상장폐지·관리종목 제외). 점수를 '역사 대비 위치'로 쓰는 것이 영향을 줄이지만 없애지는 못합니다.<br>
+      5) 밸류에이션 룰(12MF PER·PBR)의 이력이 없어 <b>밸류에이션 룰과 합친 성과는 검증하지 못했습니다.</b> 롱 북은 지수 베타 1로 가정했고, 인버스 ETF의 일일 리밸런싱 괴리와 보수는 반영하지 않았습니다.<br>
+      6) 파라미터는 고정이며 매일 다시 최적화하지 않습니다. 분기마다 <code>python scripts/research_signal.py report</code>로 재검증하세요(이 결과 생성 ${esc(RS.generated)}).
+    </div>`;
 }
 })();
 </script>

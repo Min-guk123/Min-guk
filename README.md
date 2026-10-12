@@ -22,6 +22,14 @@
 | `docs/downloads/kosdaq_rs_latest.xlsx` | 엑셀(원본 3시트 배치, 금액 십억원) |
 | `data/snapshots/` | 날짜별 섹터/종목 결과 기록 |
 | `.github/workflows/daily.yml` | 평일 16:20 KST 자동 실행 |
+| `scripts/watch_excel.py` | 엑셀 저장을 감지해 자동 갱신 + GitHub 업로드 (아래 '엑셀 자동 갱신') |
+| `scripts/signal_model.py` | ④ 탭: 수급 확산 지표·낙관 점수·숏 비중 함수 |
+| `scripts/signal_pipeline.py` | ④ 탭: 매일 갱신 때 시그널 계산 → `docs/data/signal.json` |
+| `scripts/backfill_history.py` | (한 번) 네이버에서 12년치 일봉 캐시 받기 (`data/cache/`, git 제외) |
+| `scripts/make_feature_history.py` | (한 번) 일봉 캐시 → `data/feature_history.csv` 만들기 |
+| `scripts/research_signal.py` | 연구(검증) → `docs/data/signal_research.json` (`report` 단계) |
+| `config/signal_params.json` | ④ 탭 파라미터(가감 폭, 평활, 비용, 기준 숏 비중) |
+| `data/feature_history.csv` | 수급 확산 지표 이력 (2014~, 매일 갱신 때 이어 붙음) |
 
 ## 처음 올리는 순서 (10분)
 
@@ -64,6 +72,35 @@ pip install -r requirements.txt
 python scripts/build.py --source dataguide --file "코스닥 분류.xlsx"
 ```
 엑셀 형식: 시트1 = 종목별 `수정주가`·`시가총액` 일별 시계열(내림차순), 시트2 = 코스닥 `종가지수`. 네이버 수집이 막혔을 때 이 방법으로 갱신 후 커밋하면 됩니다.
+
+## 엑셀 자동 갱신 (내 PC)
+
+엑셀(`코스닥 분류.xlsx`)을 저장하면 대시보드를 다시 계산해 GitHub에 올립니다.
+
+1. Python, Git 설치 후 `pip install -r requirements.txt`
+2. `config/local.json` 에 `{"excel_path": "C:\\경로\\코스닥 분류.xlsx"}` 를 적습니다(git에 올라가지 않음).
+3. `powershell -ExecutionPolicy Bypass -File install_autostart.ps1` — 로그인 때마다 감시 프로그램이 자동으로 켜집니다(관리자 권한 불필요).
+   수동 실행은 `start_watcher.bat`, 한 번만 갱신하려면 `python scripts/watch_excel.py --once`.
+
+## ④ 시그널·숏 비중 탭
+
+수급 확산 지표 16개(ADR, 코스닥을 이긴 종목 비율, 이동평균 위 종목 비율, 신고가−신저가, 동일가중−지수 괴리)를 평균해
+'낙관 점수'(0~100)를 만들고, 밸류에이션 룰이 정한 기준 숏 비중(저평가 50 · 중립 75 · 고평가 100%)에 ±amp 를 가감합니다.
+연구 결과는 **방향(오를지 내릴지)은 예측하지 못하고, 앞으로의 변동성·낙폭 위험을 구분**하며, 숏 가감의 효과는 작고 한두 번의 급락에 기대고 있다는 것입니다.
+자세한 근거와 한계는 탭 안의 '방법과 한계'에 있습니다.
+
+처음 한 번(또는 데이터를 새로 받고 싶을 때):
+
+```bash
+python scripts/backfill_history.py          # 네이버에서 12년치 일봉(약 10초)
+python scripts/make_feature_history.py      # data/feature_history.csv
+python scripts/research_signal.py report    # docs/data/signal_research.json (약 1분)
+```
+
+이후에는 `build.py` 가 돌 때마다 최근 지표를 이어 붙이고 `docs/data/signal.json` 을 다시 씁니다
+(엑셀 모드에서는 엑셀보다 최신인 날짜를 네이버에서 보충하며, 실패해도 무시).
+`config/signal_params.json` 의 `amp` 를 키우면(예: 0.25) 더 강하게 가감하고, `cost` 는 숏 100%를 바꿀 때의 비용입니다.
+파라미터는 매일 다시 최적화하지 않으므로 분기마다 `research_signal.py report` 로 재검증하세요.
 
 ## 계산 정의
 

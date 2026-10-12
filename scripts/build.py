@@ -223,6 +223,12 @@ def main():
     keep = ["code", "name", "sector", "mcap_rank", "mcap"] + [c for c in res["stock"].columns if c.startswith(("r_", "ex_"))]
     res["stock"][keep].to_csv(snap + "_stock.csv", index=False, encoding="utf-8-sig")
 
+    try:  # 수급 확산 시그널(④ 탭). 실패해도 위 결과는 이미 저장됐으므로 계속 진행
+        import signal_pipeline as SP
+        SP.run(prices, index, res, args.source)
+    except Exception as e:  # noqa: BLE001
+        print(f"[signal] 시그널 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
+
     n_un = len(payload["unclassified"])
     print(f"완료: 기준일 {res['asof']}, 유니버스 {res['universe_size']}종목, "
           f"1000위 시총 {payload['cutoff_mcap_bil']}십억원, 미분류 {n_un}종목")
