@@ -1,4 +1,4 @@
-"""
+﻿"""
 엑셀 파일이 저장(수정)되면 자동으로 대시보드를 다시 계산해 GitHub에 올린다.
 
 사용법
@@ -76,7 +76,7 @@ def main():
 
     path = a.file
     if not path and os.path.exists(CONFIG):
-        with open(CONFIG, encoding="utf-8") as f:
+        with open(CONFIG, encoding="utf-8-sig") as f:
             path = json.load(f).get("excel_path")
     if not path:
         sys.exit("감시할 엑셀 경로가 없습니다. config/local.json 에 excel_path 를 적거나 --file 로 지정하세요.")
@@ -104,3 +104,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

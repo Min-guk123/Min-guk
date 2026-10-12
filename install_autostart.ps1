@@ -1,9 +1,9 @@
-# 윈도우 로그인 때 감시 프로그램이 자동으로 켜지게 등록합니다. (한 번만 실행)
+﻿# Windows login autostart for the Excel watcher (no admin needed). Run once.
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $py  = (Get-Command python).Source
-$act = New-ScheduledTaskAction -Execute $py -Argument "scripts\watch_excel.py" -WorkingDirectory $dir
-$trg = New-ScheduledTaskTrigger -AtLogOn
-$set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero)
-Register-ScheduledTask -TaskName "KosdaqRS-Watcher" -Action $act -Trigger $trg -Settings $set -Force | Out-Null
-Start-ScheduledTask -TaskName "KosdaqRS-Watcher"
-Write-Host "등록 완료. 지금부터 엑셀을 저장하면 자동으로 갱신됩니다."
+$vbs = Join-Path ([Environment]::GetFolderPath("Startup")) "KosdaqRS-Watcher.vbs"
+$line = 'CreateObject("Wscript.Shell").Run """' + $py + '"" ""' + $dir + '\scripts\watch_excel.py""", 0, False'
+Set-Content -Path $vbs -Value $line -Encoding ASCII
+Write-Host "Registered: $vbs"
+Start-Process -FilePath $py -ArgumentList ('"' + $dir + '\scripts\watch_excel.py"') -WorkingDirectory $dir -WindowStyle Hidden
+Write-Host "Watcher started. Saving the Excel file now triggers an update."
