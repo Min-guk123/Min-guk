@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>코스닥 상대강도 순위</title>
+<style>
+/* 레이아웃: 요약 표 → 기간 선택 바 → 탭(섹터/종목/수급 확산). 팀 대시보드와 같은 어두운 화면 한 가지로 고정 */
+:root {
+  color-scheme: dark;
+  --bg: #0f1115; --panel: #141720; --card: #1a1d24; --line: #23262e; --line2: #2a2e37;
+  --fg: #e6e6e6; --fg2: #c9ccd1; --muted: #9aa0a6; --dim: #6b7280; --na: #3a3d45;
+  --accent: #4dabf7; --note: #ffa94d; --ok: #63e6be;
+  --pos: #ff8787; --neg: #74a7ff;
+  --s1: #3b8fd9; --s2: #d06f20; --idx: #c9ccd1;
+  --hot: 255, 99, 99; --cold: 77, 171, 247;
+  --font: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); }
+body { font-family: var(--font); color: var(--fg); margin: 0; padding-block: 24px 48px; padding-inline: max(16px, 2vw); font-size: 14px; }
+a { color: var(--accent); }
+a.back { font-size: 13px; text-decoration: none; }
+h1 { font-size: 20px; margin: 8px 0 4px; text-wrap: balance; }
+h1 .sub { font-size: 13px; color: var(--muted); font-weight: normal; margin-left: 6px; }
+.updated { color: var(--muted); font-size: 13px; margin-bottom: 14px; line-height: 1.7; }
+.updated b { color: var(--fg2); font-weight: 600; }
+details.exp { background: var(--card); border-radius: 10px; padding: 12px 18px; font-size: 12px; color: var(--muted); line-height: 1.8; max-width: 1100px; margin-bottom: 16px; }
+details.exp summary { cursor: pointer; color: var(--fg2); font-size: 13px; }
+details.exp b { color: var(--note); }
+code { background: var(--line); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+.sumwrap { overflow-x: auto; margin-bottom: 14px; }
+table.sum { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+table.sum th, table.sum td { padding: 6px 14px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.sum th { color: var(--muted); font-weight: normal; font-size: 12px; }
+table.sum .lbl { text-align: left; color: var(--muted); }
+.tabs { display: flex; gap: 6px; margin: 6px 0 12px; flex-wrap: wrap; }
+.tabs button { background: var(--card); border: 1px solid var(--line2); color: var(--muted); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-family: inherit; }
+.tabs button.on { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: bold; }
+.tabs .dl { margin-left: auto; align-self: center; font-size: 13px; text-decoration: none; border: 1px solid var(--line2); border-radius: 8px; padding: 7px 14px; }
+section.tab[hidden] { display: none; }
+.filters { display: flex; gap: 10px 14px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+.filters input, .filters select { background: var(--card); border: 1px solid var(--line2); color: var(--fg); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
+.filters input[type="number"] { width: 64px; }
+.filters input[type="text"] { width: 150px; }
+.filters button { background: var(--card); border: 1px solid var(--accent); color: var(--accent); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-family: inherit; }
+.perbar { background: var(--panel); border: 1px solid var(--line2); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+.perbar .pl { color: var(--note); font-weight: bold; }
+.hz { display: flex; flex-wrap: wrap; gap: 6px; }
+.hz label { color: var(--fg); cursor: pointer; background: var(--card); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 10px; white-space: nowrap; }
+.hz label:has(input:checked) { border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.count { color: var(--ok); font-size: 12px; margin: 8px 0; }
+.note { color: var(--dim); font-size: 12px; margin: 4px 0 10px; line-height: 1.7; }
+.table-wrap { overflow: auto; max-height: 76vh; border: 1px solid var(--line); border-radius: 8px; }
+table.main { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+table.main th, table.main td { padding: 6px 9px; text-align: center; border-bottom: 1px solid #1d2027; white-space: nowrap; }
+table.main thead th { color: var(--muted); font-weight: normal; font-size: 12px; position: sticky; top: 0; background: var(--panel); z-index: 2; cursor: pointer; user-select: none; }
+table.main thead tr.r2 th { top: 29px; font-size: 11px; }
+table.main thead th.grp { color: var(--fg); border-left: 1px solid var(--line2); cursor: default; }
+table.main .lbl { text-align: left; }
+table.main td.nm { position: sticky; left: 0; background: var(--bg); z-index: 1; font-weight: 600; text-align: left; }
+table.main thead th.nm { position: sticky; left: 0; z-index: 4; text-align: left; }
+table.main td.nm a { color: var(--fg); text-decoration: none; }
+table.main td.nm a:hover { color: var(--accent); text-decoration: underline; }
+table.main .first { border-left: 1px solid var(--line); }
+table.main tbody tr:hover td { background: var(--card); }
+tr.srow { cursor: pointer; }
+tr.mrow td { background: #12151b; color: var(--fg2); font-size: 12px; }
+tr.mrow td.nm { background: #12151b; font-weight: 500; padding-left: 26px; }
+.tg { color: var(--accent); display: inline-block; width: 14px; }
+.pos { color: var(--pos); } .neg { color: var(--neg); } .na { color: var(--na); }
+.rk { font-weight: 600; min-width: 44px; }
+.mk { font-size: 11px; color: var(--muted); font-weight: normal; }
+.up { color: var(--pos); font-size: 11px; } .dn { color: var(--neg); font-size: 11px; } .eq { color: var(--dim); font-size: 11px; }
+.chip { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line2); color: var(--muted); margin-left: 6px; font-weight: normal; }
+#moreBtn { margin: 12px auto; display: block; background: var(--card); border: 1px solid var(--line2); color: var(--fg2); border-radius: 6px; padding: 8px 20px; cursor: pointer; font-family: inherit; }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin: 6px 0 10px; align-items: center; flex-wrap: wrap; }
+.sq { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.ln { width: 16px; height: 2px; display: inline-block; vertical-align: middle; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; max-width: 1200px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.panel h3 { font-size: 14px; margin: 0 0 4px; color: var(--fg); }
+.panel .desc { font-size: 12px; color: var(--muted); margin: 0 0 8px; line-height: 1.7; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+.tip { position: absolute; pointer-events: none; background: #0b0d11; border: 1px solid var(--line2); border-radius: 6px; padding: 7px 10px; font-size: 12px; color: var(--fg2); white-space: nowrap; z-index: 5; font-variant-numeric: tabular-nums; }
+.tip b { color: var(--fg); }
+.tip[hidden] { display: none; }
+.heat-wrap { overflow-x: auto; }
+table.heat { border-collapse: separate; border-spacing: 2px; font-size: 11px; font-variant-numeric: tabular-nums; }
+table.heat th { color: var(--muted); font-weight: normal; padding: 2px 4px; white-space: nowrap; }
+table.heat th.s { text-align: left; color: var(--fg2); position: sticky; left: 0; background: var(--panel); z-index: 1; padding-right: 8px; }
+table.heat td { width: 30px; min-width: 30px; height: 20px; text-align: center; border-radius: 3px; color: var(--fg); }
+table.heat td:hover { outline: 1px solid var(--fg2); }
+.stat { display: flex; gap: 22px; flex-wrap: wrap; margin: 4px 0 10px; }
+.stat div { font-size: 12px; color: var(--muted); }
+.stat b { display: block; font-size: 20px; color: var(--fg); font-variant-numeric: tabular-nums; font-weight: 600; }
+.err { background: #2a1d1d; border: 1px solid #5c2b2b; color: #ffc9c9; padding: 12px 16px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<a class="back" href="index.html">&larr; 홈</a>
+<h1>코스닥 종목·섹터 상대강도<span class="sub">코스닥 지수 대비 초과수익률 · 시총 상위 1000종목</span></h1>
+<div class="updated" id="updated">데이터를 불러오는 중…</div>
+
+<details class="exp">
+  <summary>계산 방식과 보는 법</summary>
+  <b>계산</b>: '데이터 모음' 엑셀의 섹터별 상세·섹터 상대강도·개별종목 상대강도 시트와 같은 방식이고, 비교 지수만 코스피 대신 <b>코스닥</b>입니다.
+  수익률은 기준일 종가 ÷ N거래일 전 종가 − 1(수정주가), 기간은 1주=5, 2주=10, 1달=20, 2달=40, 3달=60, 6달=120거래일입니다.
+  <b>종목 초과수익률</b> = 종목 수익률 − 코스닥 수익률. <b>섹터 초과수익률</b> = 섹터 소속 종목 수익률의 단순평균 − 코스닥 수익률(엑셀과 같은 방식). 중앙값이나 코스닥을 이긴 종목 비율로도 순위를 볼 수 있습니다.<br>
+  <b>유니버스</b>: 기준일 코스닥 시가총액 상위 1000종목(스팩·우선주 제외). 매일 다시 뽑으므로 1000위 근처 종목은 들고 날 수 있습니다.
+  <b>코스닥비중</b>은 1000종목 시총 합을 100%로 본 섹터 비중입니다. 금액은 십억원 단위입니다.<br>
+  <b>섹터</b>: 데이터 모음의 '섹터별 구성 종목' 분류를 먼저 쓰고, 거기 없는 종목은 같은 섹터 체계로 따로 분류했습니다. 코스닥에만 많은 교육주는 '교육' 섹터를 새로 만들었습니다. 분류표는 저장소의 <code>config/sector_map.csv</code>에 있고, 고치면 다음 갱신부터 반영됩니다.<br>
+  <b>수급 확산</b> 탭: 날짜마다 코스닥을 이긴 종목 비율을 다시 계산했습니다. 지수가 오르는데 이 비율이 낮으면 소수 대형주가 끄는 장이고, 비율이 같이 오르면 매수세가 더 많은 종목으로 퍼지는 중입니다. 과거 날짜도 오늘의 1000종목 기준으로 계산합니다.
+</details>
+
+<div class="sumwrap"><table class="sum" id="sumTable"></table></div>
+
+<div class="tabs" id="tabs">
+  <button data-tab="t1" class="on" id="tabBtn1">① 섹터 상대강도 순위</button>
+  <button data-tab="t2" id="tabBtn2">② 종목 상대강도 순위</button>
+  <button data-tab="t3" id="tabBtn3">③ 수급 확산</button>
+  <a class="dl" href="downloads/kosdaq_rs_latest.xlsx">엑셀 받기 (3시트)</a>
+</div>
+
+<div class="filters perbar" id="perBar">
+  <span class="pl">기간 선택</span>
+  <span class="hz" id="hzChk"></span>
+  <button id="perAll">전체</button>
+  <button id="perShort">단기(1주·2주·1달)</button>
+  <button id="perLong">중장기(2달·3달·6달)</button>
+  <label>조건 묶기 <select id="fMode"><option value="all">선택한 기간 모두 충족</option><option value="any">하나라도 충족</option></select></label>
+</div>
+
+<section class="tab" id="t1">
+  <div class="filters">
+    <label>순위 기준 <select id="sMetric"><option value="ex">평균 초과수익률 (엑셀과 같은 방식)</option><option value="med">중앙값 초과수익률</option><option value="win">코스닥을 이긴 종목 비율</option></select></label>
+    <label><input type="checkbox" id="sAbs"> 절대수익률로 보기</label>
+    <label><input type="checkbox" id="sNoMisc"> 개별주 묶음 제외</label>
+    <label>최소 종목수 <input type="number" id="sMinN" min="1" step="1" value="3"></label>
+    <label><input type="checkbox" id="sWinOnly"> 코스닥을 이긴 섹터만</label>
+    <button id="sExpandAll">모두 펼치기</button>
+    <button id="sCollapseAll">모두 접기</button>
+    <button id="sCsv">CSV 저장</button>
+  </div>
+  <div class="note" id="secNote"></div>
+  <div class="table-wrap"><table class="main"><thead id="sHead"></thead><tbody id="sBody"></tbody></table></div>
+</section>
+
+<section class="tab" id="t2" hidden>
+  <div class="filters">
+    <label>검색 <input type="text" id="fSearch" placeholder="종목명/코드"></label>
+    <label>섹터 <select id="fSector"><option value="">전체</option></select></label>
+    <label>순위 기준 <select id="fScope"><option value="all">1000종목 전체</option><option value="sec">같은 섹터 안</option></select></label>
+    <label>표시 <select id="fShow"><option value="both">순위 + 초과수익률</option><option value="rank">순위만</option><option value="ex">초과수익률만</option></select></label>
+    <label>정렬 <select id="fSort"></select></label>
+  </div>
+  <div class="filters">
+    <label><input type="checkbox" id="fWin"> 코스닥을 이긴 종목만</label>
+    <label><input type="checkbox" id="fTopOn"> 순위 상위 <input type="number" id="fTop" min="1" step="1" value="10"> <select id="fTopUnit"><option value="pct">%</option><option value="rank">위</option></select> 이내</label>
+    <button id="resetBtn">필터 초기화</button>
+    <button id="csvBtn">현재 표 CSV 저장</button>
+  </div>
+  <div class="legend"><span>순위 색</span><span class="sq" style="background:rgba(var(--hot),0.58)"></span><span>상위</span><span class="sq" style="background:rgba(255,255,255,0.06)"></span><span>중간</span><span class="sq" style="background:rgba(var(--cold),0.58)"></span><span>하위</span><span>· 칸에 마우스를 올리면 몇 종목 중 몇 위인지 보입니다</span></div>
+  <div class="count" id="count"></div>
+  <div class="table-wrap"><table class="main"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <button id="moreBtn" hidden>더 보기</button>
+</section>
+
+<section class="tab" id="t3" hidden>
+  <div class="grid2">
+    <div class="panel">
+      <h3>코스닥을 이긴 종목 비율</h3>
+      <p class="desc">시총 상위 1000종목 중 같은 기간 코스닥 수익률을 넘은 종목의 비율입니다. 50% 위로 올라가면 매수세가 지수 상위 대형주를 넘어 중소형주로 퍼지고 있다는 뜻입니다.</p>
+      <div class="stat" id="bStat"></div>
+      <div class="legend"><span><span class="ln" style="background:var(--s1)"></span> 1주(5거래일) 기준</span><span><span class="ln" style="background:var(--s2)"></span> 1달(20거래일) 기준</span><span><span class="ln" style="background:var(--dim)"></span> 50%</span></div>
+      <div class="chart" id="chB"></div>
+    </div>
+    <div class="panel">
+      <h3>코스닥 지수</h3>
+      <p class="desc">위 차트와 같은 기간입니다. 지수와 비율이 같은 방향인지 함께 보세요.</p>
+      <div class="chart" id="chI"></div>
+    </div>
+    <div class="panel">
+      <h3>섹터 순위 추이</h3>
+      <p class="desc">날짜별 섹터 초과수익률 순위입니다(빨강 = 상위, 파랑 = 하위). 상위권 색이 여러 섹터로 번지면 순환매가 넓어지는 것이고, 같은 몇 섹터에만 머물면 쏠림입니다. 정렬은 기준일 순위입니다.</p>
+      <div class="filters">
+        <label>기간 <select id="hWin"><option value="1주">1주 초과수익률</option><option value="1달">1달 초과수익률</option></select></label>
+        <label>표시 일수 <select id="hDays"><option value="20">최근 20거래일</option><option value="40">최근 40거래일</option><option value="60">최근 60거래일</option></select></label>
+        <label><input type="checkbox" id="hNoMisc" checked> 개별주 묶음 제외</label>
+      </div>
+      <div class="heat-wrap"><table class="heat" id="heat"></table></div>
+    </div>
+  </div>
+</section>
+
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (v, d = 2) => (v == null || isNaN(v)) ? "-" : (v * 100).toFixed(d) + "%";
+const sgn = (v, d = 2) => (v == null || isNaN(v)) ? '<span class="na">-</span>' : `<span class="${v > 0 ? "pos" : v < 0 ? "neg" : ""}">${v > 0 ? "+" : ""}${(v * 100).toFixed(d)}%</span>`;
+const fmt1 = (v) => v == null ? "-" : v.toLocaleString("ko-KR", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+let D, H, NH, S = [], SEC = [], sel;
+
+function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem("kqrs_" + k)); localStorage.setItem("kqrs_" + k, JSON.stringify(v)); } catch (e) { return null; } }
+
+fetch("data/latest.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(init).catch((e) => { $("updated").innerHTML = `<div class="err">데이터 파일(data/latest.json)을 읽지 못했습니다 (${esc(e.message)}). 저장소의 Actions 실행 기록을 확인하세요.</div>`; });
+
+function init(data) {
+  D = data; H = D.stock_h; NH = H.length;
+  const C = D.stock_cols, ci = (n) => C.indexOf(n);
+  S = D.stocks.map((r) => ({
+    code: r[0], name: r[1], sector: r[2], mrank: r[3], mcap: r[4],
+    raw: D.detail_h.map((l) => r[ci("r_" + l)]),
+    ex: H.map((l) => r[ci("ex_" + l)]),
+  }));
+  // 순위(전체 / 섹터 내)
+  H.forEach((_, k) => {
+    const valid = S.filter((s) => s.ex[k] != null).sort((a, b) => b.ex[k] - a.ex[k]);
+    valid.forEach((s, i) => { (s.rk ||= [])[k] = i + 1; });
+    S.forEach((s) => { (s.rk ||= [])[k] ??= null; });
+    const bySec = {};
+    valid.forEach((s) => { (bySec[s.sector] ||= []).push(s); });
+    Object.values(bySec).forEach((arr) => arr.forEach((s, i) => { (s.srk ||= [])[k] = i + 1; s.sn = s.sn || []; s.sn[k] = arr.length; }));
+  });
+  H.__n = H.map((_, k) => S.filter((s) => s.ex[k] != null).length);
+  SEC = D.sectors;
+
+  const ir = D.index_ret;
+  $("updated").innerHTML = `데이터 기준일 <b>${esc(D.asof)}</b> · 생성 ${esc(D.generated)} · 코스닥 ${D.index_level.toLocaleString("ko-KR")} · `
+    + `유니버스 <b>${D.universe_size.toLocaleString()}종목</b> (1000위 시총 ${fmt1(D.cutoff_mcap_bil)}십억원) · 출처 ${esc(D.source)}`
+    + (D.unclassified.length ? ` · <span class="pos">미분류 ${D.unclassified.length}종목</span>` : "");
+  // 요약표
+  let h = '<tr><th class="lbl"></th>' + H.map((l) => `<th>${l}</th>`).join("") + "</tr>";
+  h += '<tr><td class="lbl">코스닥 수익률</td>' + H.map((l) => `<td>${sgn(ir[l])}</td>`).join("") + "</tr>";
+  h += '<tr><td class="lbl">코스닥을 이긴 종목</td>' + H.map((_, k) => {
+    const n = S.filter((s) => s.ex[k] > 0).length, t = H.__n[k];
+    return `<td>${n.toLocaleString()} / ${t.toLocaleString()} <span class="mk">(${t ? (n / t * 100).toFixed(0) : 0}%)</span></td>`;
+  }).join("") + "</tr>";
+  h += '<tr><td class="lbl">코스닥을 이긴 섹터</td>' + H.map((_, k) => {
+    const v = SEC.filter((s) => s.sector !== "미분류" && s.ex[k] != null), n = v.filter((s) => s.ex[k] > 0).length;
+    return `<td>${n} / ${v.length}</td>`;
+  }).join("") + "</tr>";
+  $("sumTable").innerHTML = h;
+
+  sel = store("sel") || [true, true, true, true, true, false];
+  $("hzChk").innerHTML = H.map((l, k) => `<label><input type="checkbox" id="hz${k}" data-k="${k}" ${sel[k] ? "checked" : ""}> ${l}</label>`).join("");
+  $("hzChk").addEventListener("change", (e) => { const k = +e.target.dataset.k; sel[k] = e.target.checked; if (!sel.some(Boolean)) { sel[k] = true; e.target.checked = true; } store("sel", sel); rebuildSort(); renderAll(); });
+  const setSel = (arr) => { sel = arr; arr.forEach((v, k) => { $("hz" + k).checked = v; }); store("sel", sel); rebuildSort(); renderAll(); };
+  $("perAll").onclick = () => setSel(H.map(() => true));
+  $("perShort").onclick = () => setSel(H.map((_, k) => k < 3));
+  $("perLong").onclick = () => setSel(H.map((_, k) => k >= 3));
+  $("fMode").onchange = renderAll;
+
+  const secs = [...new Set(S.map((s) => s.sector))].sort((a, b) => a.localeCompare(b, "ko"));
+  $("fSector").innerHTML += secs.map((s) => `<option>${esc(s)}</option>`).join("");
+  ["fSearch", "fSector", "fScope", "fShow", "fSort", "fWin", "fTopOn", "fTop", "fTopUnit"].forEach((id) => $(id).addEventListener("input", () => { page = 1; renderStocks(); }));
+  $("resetBtn").onclick = () => { $("fSearch").value = ""; $("fSector").value = ""; $("fWin").checked = false; $("fTopOn").checked = false; $("fScope").value = "all"; $("fShow").value = "both"; rebuildSort(); page = 1; renderStocks(); };
+  $("moreBtn").onclick = () => { page++; renderStocks(); };
+  $("csvBtn").onclick = stockCsv;
+  ["sMetric", "sAbs", "sNoMisc", "sMinN", "sWinOnly"].forEach((id) => $(id).addEventListener("input", renderSectors));
+  $("sExpandAll").onclick = () => { SEC.forEach((s) => open.add(s.sector)); renderSectors(); };
+  $("sCollapseAll").onclick = () => { open.clear(); renderSectors(); };
+  $("sCsv").onclick = sectorCsv;
+  ["hWin", "hDays", "hNoMisc"].forEach((id) => $(id).addEventListener("input", renderHeat));
+
+  document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+  const hash = (location.hash || "").replace("#", "");
+  showTab(["t1", "t2", "t3"].includes(hash) ? hash : (store("tab") || "t1"));
+  rebuildSort();
+  renderAll();
+}
+
+function showTab(t) {
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
+  ["t1", "t2", "t3"].forEach((id) => { $(id).hidden = id !== t; });
+  $("perBar").hidden = t === "t3";
+  store("tab", t);
+  if (t === "t3") renderBreadth();
+}
+const ks = () => H.map((_, k) => k).filter((k) => sel[k]);
+function renderAll() { renderSectors(); renderStocks(); }
+
+/* ---------- 순위 색 ---------- */
+function rkStyle(r, n) {
+  if (r == null || !n) return "";
+  const p = (r - 1) / Math.max(1, n - 1);
+  if (p <= 0.5) { const a = (0.5 - p) / 0.5; return `background:rgba(var(--hot),${(0.08 + a * 0.5).toFixed(2)})`; }
+  const a = (p - 0.5) / 0.5; return `background:rgba(var(--cold),${(0.08 + a * 0.5).toFixed(2)})`;
+}
+const chg = (now, prev) => {
+  if (now == null || prev == null) return '<span class="eq">-</span>';
+  const d = prev - now;
+  return d > 0 ? `<span class="up">▲${d}</span>` : d < 0 ? `<span class="dn">▼${-d}</span>` : '<span class="eq">–</span>';
+};
+
+/* ---------- ① 섹터 ---------- */
+const open = new Set();
+function secVal(s, k, metric) {
+  const v = s[metric][k];
+  if (v == null) return null;
+  if (metric !== "win" && $("sAbs").checked) return v + (D.index_ret[H[k]] ?? 0);
+  return v;
+}
+function renderSectors() {
+  const metric = $("sMetric").value, K = ks(), minN = +$("sMinN").value || 1, mode = $("fMode").value;
+  let rows = SEC.filter((s) => s.n >= minN && !($("sNoMisc").checked && s.sector === "개별주"));
+  // 순위는 필터 후 남은 섹터 안에서 다시 매김
+  const rank = {};
+  H.forEach((_, k) => {
+    rows.filter((s) => secVal(s, k, metric) != null).sort((a, b) => secVal(b, k, metric) - secVal(a, k, metric))
+      .forEach((s, i) => { (rank[s.sector] ||= [])[k] = i + 1; });
+  });
+  const nRank = H.map((_, k) => rows.filter((s) => secVal(s, k, metric) != null).length);
+  if ($("sWinOnly").checked) {
+    const ok = (s, k) => (s.ex[k] ?? -1) > 0;
+    rows = rows.filter((s) => mode === "all" ? K.every((k) => ok(s, k)) : K.some((k) => ok(s, k)));
+  }
+  const avg = (s) => { const v = K.map((k) => rank[s.sector]?.[k]).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 1e9; };
+  rows.sort((a, b) => avg(a) - avg(b));
+  const mlab = metric === "win" ? "이긴 비율" : $("sAbs").checked ? "수익률" : "초과수익";
+  let h = '<tr><th class="nm lbl" rowspan="2">섹터</th><th rowspan="2">종목수</th><th rowspan="2">코스닥비중</th><th rowspan="2">시총(십억원)</th>'
+    + (K.length > 1 ? '<th rowspan="2">평균 순위</th>' : "")
+    + K.map((k) => `<th class="grp" colspan="2">${H[k]}</th>`).join("")
+    + '<th class="grp" rowspan="2">1주 순위 변화<br><span class="mk">5거래일 전 대비</span></th><th rowspan="2">이긴 종목 비율<br><span class="mk">1주</span></th></tr>';
+  h += '<tr class="r2">' + K.map((k) => `<th class="first">순위</th><th>${mlab}</th>`).join("") + "</tr>";
+  $("sHead").innerHTML = h;
+  const memberSort = K[0];
+  let b = "";
+  rows.forEach((s) => {
+    const isOpen = open.has(s.sector);
+    b += `<tr class="srow" data-s="${esc(s.sector)}"><td class="nm"><span class="tg">${isOpen ? "▾" : "▸"}</span>${esc(s.sector)}</td><td>${s.n}</td><td>${pct(s.weight)}</td><td>${fmt1(s.mcap)}</td>`
+      + (K.length > 1 ? `<td class="rk">${avg(s) < 1e8 ? avg(s).toFixed(1) : "-"}</td>` : "")
+      + K.map((k) => { const r = rank[s.sector]?.[k]; const v = secVal(s, k, metric);
+        return `<td class="rk first" style="${rkStyle(r, nRank[k])}" title="${nRank[k]}개 섹터 중 ${r ?? "-"}위">${r ?? "-"}</td><td>${metric === "win" ? pct(v, 0) : sgn(v)}</td>`; }).join("")
+      + `<td class="first">${chg(rankOf1w(s.sector), s.rk_prev_1w)}</td><td>${pct(s.win[0], 0)}</td></tr>`;
+    if (isOpen) {
+      const mem = S.filter((x) => x.sector === s.sector).sort((a, b) => (b.ex[memberSort] ?? -9) - (a.ex[memberSort] ?? -9));
+      mem.forEach((m) => {
+        b += `<tr class="mrow"><td class="nm"><a href="https://finance.naver.com/item/main.naver?code=${m.code}" target="_blank" rel="noopener">${esc(m.name)}</a> <span class="mk">${m.code}</span></td><td></td><td></td><td>${fmt1(m.mcap)}</td>`
+          + (K.length > 1 ? "<td></td>" : "")
+          + K.map((k) => { const v = $("sAbs").checked ? (m.ex[k] == null ? null : m.ex[k] + (D.index_ret[H[k]] ?? 0)) : m.ex[k];
+            return `<td class="first" style="${rkStyle(m.srk?.[k], m.sn?.[k])}" title="섹터 안 ${m.sn?.[k] ?? "-"}종목 중 ${m.srk?.[k] ?? "-"}위">${m.srk?.[k] ?? "-"}</td><td>${sgn(v)}</td>`; }).join("")
+          + `<td class="first mk">전체 ${m.rk[0] ?? "-"}위</td><td></td></tr>`;
+      });
+    }
+  });
+  $("sBody").innerHTML = b || `<tr><td colspan="20" class="note">조건에 맞는 섹터가 없습니다.</td></tr>`;
+  $("sBody").querySelectorAll("tr.srow").forEach((tr) => tr.onclick = () => { const k = tr.dataset.s; open.has(k) ? open.delete(k) : open.add(k); renderSectors(); });
+  $("secNote").textContent = `${rows.length}개 섹터 · 섹터를 누르면 소속 종목(섹터 안 순위)이 펼쳐집니다 · 여러 기간을 고르면 평균 순위로 정렬합니다 · 종목 수가 적은 섹터는 한두 종목에 크게 흔들립니다(최소 종목수로 거를 수 있음).`;
+}
+function rankOf1w(sector) {
+  const v = SEC.filter((s) => s.sector !== "미분류" && s.ex[0] != null).sort((a, b) => b.ex[0] - a.ex[0]);
+  const i = v.findIndex((s) => s.sector === sector); return i < 0 ? null : i + 1;
+}
+
+/* ---------- ② 종목 ---------- */
+let page = 1; const PER = 100;
+function rebuildSort() {
+  const K = ks(), cur = $("fSort").value;
+  const opts = [];
+  if (K.length > 1) opts.push(["avg", "선택 기간 평균 순위"]);
+  K.forEach((k) => opts.push(["k" + k, `${H[k]} 순위`]));
+  opts.push(["mcap", "시가총액 순"]);
+  $("fSort").innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+  if (opts.some((o) => o[0] === cur)) $("fSort").value = cur;
+}
+function stockRows() {
+  const K = ks(), q = $("fSearch").value.trim().toLowerCase(), sec = $("fSector").value, scope = $("fScope").value, mode = $("fMode").value;
+  const R = (s, k) => scope === "sec" ? s.srk?.[k] : s.rk[k];
+  const N = (s, k) => scope === "sec" ? s.sn?.[k] : H.__n[k];
+  let rows = S.filter((s) => (!sec || s.sector === sec) && (!q || s.name.toLowerCase().includes(q) || s.code.includes(q)));
+  const conds = [];
+  if ($("fWin").checked) conds.push((s, k) => s.ex[k] > 0);
+  if ($("fTopOn").checked) {
+    const t = +$("fTop").value || 10, unit = $("fTopUnit").value;
+    conds.push((s, k) => { const r = R(s, k), n = N(s, k); if (r == null) return false; return unit === "pct" ? r <= Math.ceil(n * t / 100) : r <= t; });
+  }
+  if (conds.length) rows = rows.filter((s) => { const f = (k) => conds.every((c) => c(s, k)); return mode === "all" ? K.every(f) : K.some(f); });
+  const sv = $("fSort").value;
+  const avg = (s) => { const v = K.map((k) => R(s, k)).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 1e9; };
+  if (sv === "mcap") rows.sort((a, b) => a.mrank - b.mrank);
+  else if (sv && sv[0] === "k") { const k = +sv.slice(1); rows.sort((a, b) => (R(a, k) ?? 1e9) - (R(b, k) ?? 1e9)); }
+  else rows.sort((a, b) => avg(a) - avg(b));
+  return { rows, K, R, N, avg };
+}
+function renderStocks() {
+  const { rows, K, R, N, avg } = stockRows(), show = $("fShow").value, scope = $("fScope").value;
+  const cols = show === "both" ? 2 : 1;
+  let h = '<tr><th class="nm lbl" rowspan="2">종목</th><th rowspan="2">섹터</th><th rowspan="2">시총(십억원)</th>'
+    + (K.length > 1 ? '<th rowspan="2">평균 순위</th>' : "")
+    + K.map((k) => `<th class="grp" colspan="${cols}">${H[k]}</th>`).join("") + "</tr><tr class=\"r2\">"
+    + K.map(() => (show !== "ex" ? '<th class="first">순위</th>' : "") + (show !== "rank" ? `<th${show === "ex" ? ' class="first"' : ""}>초과수익</th>` : "")).join("") + "</tr>";
+  $("thead").innerHTML = h;
+  const vis = rows.slice(0, page * PER);
+  $("tbody").innerHTML = vis.map((s) => `<tr><td class="nm"><a href="https://finance.naver.com/item/main.naver?code=${s.code}" target="_blank" rel="noopener">${esc(s.name)}</a> <span class="mk">${s.code}</span></td>`
+    + `<td class="lbl">${esc(s.sector)}</td><td>${fmt1(s.mcap)} <span class="mk">#${s.mrank}</span></td>`
+    + (K.length > 1 ? `<td class="rk">${avg(s) < 1e8 ? avg(s).toFixed(1) : "-"}</td>` : "")
+    + K.map((k) => { const r = R(s, k), n = N(s, k);
+      return (show !== "ex" ? `<td class="rk first" style="${rkStyle(r, n)}" title="${n ?? "-"}종목 중 ${r ?? "-"}위${r ? ` (상위 ${(r / n * 100).toFixed(1)}%)` : ""}">${r ?? "-"}</td>` : "")
+        + (show !== "rank" ? `<td${show === "ex" ? ' class="first"' : ""}>${sgn(s.ex[k])}</td>` : ""); }).join("") + "</tr>").join("")
+    || `<tr><td colspan="20" class="note">조건에 맞는 종목이 없습니다.</td></tr>`;
+  $("count").textContent = `${rows.length.toLocaleString()}종목 중 ${vis.length.toLocaleString()}개 표시 · 순위 기준: ${scope === "sec" ? "같은 섹터 안" : "1000종목 전체"}`;
+  $("moreBtn").hidden = vis.length >= rows.length;
+}
+
+/* ---------- CSV ---------- */
+function download(name, rows) {
+  const csv = "﻿" + rows.map((r) => r.map((v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+const p4 = (v) => v == null ? "" : (v * 100).toFixed(2);
+function stockCsv() {
+  const { rows, K, R } = stockRows();
+  download(`kosdaq_rs_stocks_${D.asof}.csv`, [["코드", "종목", "섹터", "시총(십억원)", "시총순위", ...K.flatMap((k) => [`${H[k]} 순위`, `${H[k]} 초과수익(%)`])],
+    ...rows.map((s) => [s.code, s.name, s.sector, s.mcap, s.mrank, ...K.flatMap((k) => [R(s, k), p4(s.ex[k])])])]);
+}
+function sectorCsv() {
+  download(`kosdaq_rs_sectors_${D.asof}.csv`, [["섹터", "종목수", "코스닥비중(%)", "시총(십억원)", ...H.flatMap((l) => [`${l} 평균초과(%)`, `${l} 중앙값초과(%)`, `${l} 이긴비율(%)`])],
+    ...SEC.map((s) => [s.sector, s.n, p4(s.weight), s.mcap, ...H.flatMap((_, k) => [p4(s.ex[k]), p4(s.med[k]), p4(s.win[k])])])]);
+}
+
+/* ---------- ③ 수급 확산 ---------- */
+let breadthDone = false;
+function renderBreadth() {
+  if (breadthDone) return; breadthDone = true;
+  const B = D.breadth;
+  const last = B[B.length - 1], wk = B[Math.max(0, B.length - 6)], mo = B[Math.max(0, B.length - 21)];
+  const dv = (a, b) => { const d = (a - b) * 100; return `<span class="${d > 0 ? "pos" : d < 0 ? "neg" : ""}">${d > 0 ? "+" : ""}${d.toFixed(1)}%p</span>`; };
+  $("bStat").innerHTML = `<div>1주 기준 이긴 비율<b>${pct(last["pct_1주"], 1)}</b>1주 전 대비 ${dv(last["pct_1주"], wk["pct_1주"])}</div>`
+    + `<div>1달 기준 이긴 비율<b>${pct(last["pct_1달"], 1)}</b>1달 전 대비 ${dv(last["pct_1달"], mo["pct_1달"])}</div>`
+    + `<div>코스닥 1주 / 1달<b>${pct(last["idx_1주"], 1)} / ${pct(last["idx_1달"], 1)}</b>${esc(last.date)} 기준</div>`;
+  lineChart($("chB"), B, [{ key: "pct_1주", color: "var(--s1)", label: "1주 기준" }, { key: "pct_1달", color: "var(--s2)", label: "1달 기준" }],
+    { min: 0, max: 1, ticks: [0, .25, .5, .75, 1], fmt: (v) => (v * 100).toFixed(0) + "%", ref: 0.5, h: 260 });
+  const lv = B.map((b) => b.kosdaq), lo = Math.min(...lv), hi = Math.max(...lv), pad = (hi - lo) * 0.08;
+  const step = niceStep((hi - lo + 2 * pad) / 4), t0 = Math.ceil((lo - pad) / step) * step, ticks = [];
+  for (let t = t0; t <= hi + pad; t += step) ticks.push(t);
+  lineChart($("chI"), B, [{ key: "kosdaq", color: "var(--idx)", label: "코스닥" }],
+    { min: lo - pad, max: hi + pad, ticks, fmt: (v) => v.toLocaleString("ko-KR", { maximumFractionDigits: 0 }), h: 180 });
+  renderHeat();
+}
+function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
+
+function lineChart(el, data, series, o) {
+  const W = 1000, Hh = o.h, L = 52, R = 14, T = 10, Bm = 26, n = data.length;
+  const x = (i) => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
+  const y = (v) => T + (Hh - T - Bm) * (1 - (v - o.min) / (o.max - o.min));
+  let s = `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(series.map((q) => q.label).join(", "))} 추이">`;
+  o.ticks.forEach((t) => { s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${o.fmt(t)}</text>`; });
+  if (o.ref != null) s += `<line x1="${L}" x2="${W - R}" y1="${y(o.ref)}" y2="${y(o.ref)}" stroke="var(--dim)" stroke-width="1" stroke-dasharray="4 4"/>`;
+  const months = new Set(); data.forEach((d, i) => { const m = d.date.slice(0, 7); if (!months.has(m)) { months.add(m); if (i > 2 || i === 0) s += `<text x="${x(i)}" y="${Hh - 6}" text-anchor="${i === 0 ? "start" : "middle"}">${d.date.slice(2, 7).replace("-", ".")}</text>`; } });
+  series.forEach((q) => {
+    const pts = data.map((d, i) => d[q.key] == null ? null : `${x(i).toFixed(1)},${y(d[q.key]).toFixed(1)}`).filter(Boolean);
+    s += `<polyline fill="none" stroke="${q.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(" ")}"/>`;
+    const lv = data[n - 1][q.key]; if (lv != null) s += `<circle cx="${x(n - 1)}" cy="${y(lv)}" r="4" fill="${q.color}" stroke="var(--panel)" stroke-width="2"/>`;
+  });
+  s += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${Hh - Bm}" stroke="var(--fg2)" stroke-width="1" visibility="hidden"/>`;
+  s += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${Hh - T - Bm}" fill="transparent" class="hit"/></svg>`;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg"), xh = svg.querySelector(".xh"), tip = $("tip");
+  const move = (ev) => {
+    const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) / rc.width * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - L) / (W - L - R) * (n - 1))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div class="mk">${esc(data[i].date)}</div>` + series.map((q) => `<div><span class="ln" style="background:${q.color}"></span> <b>${o.fmt(data[i][q.key])}</b> ${esc(q.label)}</div>`).join("");
+    tip.hidden = false;
+    const tx = ev.clientX + 14, tw = tip.offsetWidth;
+    tip.style.left = (tx + tw > window.innerWidth - 8 ? ev.clientX - tw - 14 : tx) + window.scrollX + "px";
+    tip.style.top = ev.clientY + window.scrollY - 10 + "px";
+  };
+  const hit = svg.querySelector(".hit");
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); });
+}
+
+function renderHeat() {
+  const win = $("hWin").value, days = +$("hDays").value, noMisc = $("hNoMisc").checked;
+  const hist = D.sector_hist[win] || {}, dates = Object.keys(hist).slice(-days);
+  if (!dates.length) { $("heat").innerHTML = ""; return; }
+  const lastD = hist[dates[dates.length - 1]];
+  let secs = Object.keys(lastD.rk).filter((s) => !(noMisc && s === "개별주"));
+  // 개별주 제외 시 순위를 다시 매김
+  const rerank = (obj) => { const arr = secs.filter((s) => obj.ex[s] != null).sort((a, b) => obj.ex[b] - obj.ex[a]); const r = {}; arr.forEach((s, i) => { r[s] = i + 1; }); return r; };
+  const R = dates.map((d) => rerank(hist[d]));
+  const lastR = R[R.length - 1];
+  secs.sort((a, b) => (lastR[a] ?? 99) - (lastR[b] ?? 99));
+  const n = secs.length;
+  let h = '<tr><th class="s">섹터</th>' + dates.map((d, i) => `<th>${(i % 5 === 0 || i === dates.length - 1) ? d.slice(5).replace("-", "/") : ""}</th>`).join("") + "</tr>";
+  secs.forEach((s) => {
+    h += `<tr><th class="s">${esc(s)}</th>` + dates.map((d, i) => { const r = R[i][s], ex = hist[d].ex[s];
+      return `<td style="${rkStyle(r, n)}" data-t="${esc(s)} · ${d}&#10;${win} 초과수익 ${ex == null ? "-" : (ex * 100).toFixed(2) + "%"} · ${n}개 중 ${r ?? "-"}위">${r ?? ""}</td>`; }).join("") + "</tr>";
+  });
+  const t = $("heat"); t.innerHTML = h;
+  const tip = $("tip");
+  t.onpointermove = (ev) => { const td = ev.target.closest("td"); if (!td) { tip.hidden = true; return; }
+    tip.textContent = ""; td.dataset.t.split("\n").forEach((line, j) => { const dv = document.createElement("div"); if (j === 0) dv.className = "mk"; dv.textContent = line; tip.appendChild(dv); });
+    tip.hidden = false; tip.style.left = ev.clientX + window.scrollX + 14 + "px"; tip.style.top = ev.clientY + window.scrollY - 10 + "px"; };
+  t.onpointerleave = () => { tip.hidden = true; };
+}
+})();
+</script>
+</body>
+</html>

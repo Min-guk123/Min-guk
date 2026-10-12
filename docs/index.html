@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>코스닥 리서치 대시보드</title>
+<style>
+  :root { color-scheme: dark; --bg:#0f1115; --card:#1a1d24; --line:#23262e; --fg:#e6e6e6; --muted:#9aa0a6; --accent:#4dabf7; }
+  * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+  body { font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: var(--bg); color: var(--fg); margin: 0;
+    padding-block: 60px; padding-inline: 24px; display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 26px; margin: 0 0 8px; }
+  .updated { color: var(--muted); font-size: 13px; margin-bottom: 40px; }
+  .content { width: 100%; max-width: 920px; }
+  .section-title { font-size: 13px; color: var(--accent); letter-spacing: 0.06em; font-weight: bold; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+  a.card { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 22px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+  a.card:hover, a.card:focus-visible { border-color: var(--accent); transform: translateY(-2px); outline: none; }
+  .card h2 { font-size: 17px; margin: 0 0 8px; }
+  .card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 0; }
+  .card .arrow { color: var(--accent); font-size: 13px; margin-top: 14px; }
+  @media (prefers-reduced-motion: reduce) { a.card { transition: none; } }
+</style>
+</head>
+<body>
+  <h1>코스닥 리서치 대시보드</h1>
+  <div class="updated" id="upd">매 영업일 장 마감 후 자동 갱신</div>
+  <div class="content">
+    <h3 class="section-title">수급 · 상대강도</h3>
+    <div class="cards">
+      <a class="card" href="kosdaq_rs.html">
+        <h2>코스닥 종목·섹터 상대강도</h2>
+        <p>코스닥 시총 상위 1000종목의 1주~6달 코스닥 대비 초과수익률 순위, 섹터 순위, 코스닥을 이긴 종목 비율(수급 확산) 추이.</p>
+        <div class="arrow">바로가기 &rarr;</div>
+      </a>
+    </div>
+  </div>
+<script>
+fetch("data/latest.json", { cache: "no-store" }).then(r => r.json()).then(d => {
+  document.getElementById("upd").textContent = `데이터 기준일 ${d.asof} · 최종 갱신 ${d.generated}`;
+}).catch(() => {});
+</script>
+</body>
+</html>
