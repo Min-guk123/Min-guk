@@ -64,6 +64,8 @@ table.main td.nm { position: sticky; left: 0; background: var(--bg); z-index: 1;
 table.main thead th.nm { position: sticky; left: 0; z-index: 4; text-align: left; }
 table.main td.nm a { color: var(--fg); text-decoration: none; }
 table.main td.nm a:hover { color: var(--accent); text-decoration: underline; }
+.winstat { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin: 8px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.winstat b { font-size: 15px; }
 table.main .first { border-left: 1px solid var(--line); }
 table.main tbody tr:hover td { background: var(--card); }
 tr.srow { cursor: pointer; }
@@ -166,6 +168,7 @@ table.heat td:hover { outline: 1px solid var(--fg2); }
     <button id="csvBtn">현재 표 CSV 저장</button>
   </div>
   <div class="legend"><span>순위 색</span><span class="sq" style="background:rgba(var(--hot),0.58)"></span><span>상위</span><span class="sq" style="background:rgba(255,255,255,0.06)"></span><span>중간</span><span class="sq" style="background:rgba(var(--cold),0.58)"></span><span>하위</span><span>· 칸에 마우스를 올리면 몇 종목 중 몇 위인지 보입니다</span></div>
+  <div class="winstat" id="winStat"></div>
   <div class="count" id="count"></div>
   <div class="table-wrap"><table class="main"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
   <button id="moreBtn" hidden>더 보기</button>
@@ -379,6 +382,7 @@ function stockRows() {
   const R = (s, k) => scope === "sec" ? s.srk?.[k] : s.rk[k];
   const N = (s, k) => scope === "sec" ? s.sn?.[k] : H.__n[k];
   let rows = S.filter((s) => (!sec || s.sector === sec) && (!q || s.name.toLowerCase().includes(q) || s.code.includes(q)));
+  const base = rows;  // 이긴 종목 수는 '이긴 종목만' 등 순위 필터를 걸기 전 범위로 센다
   const conds = [];
   if ($("fWin").checked) conds.push((s, k) => s.ex[k] > 0);
   if ($("fTopOn").checked) {
@@ -391,10 +395,14 @@ function stockRows() {
   if (sv === "mcap") rows.sort((a, b) => a.mrank - b.mrank);
   else if (sv && sv[0] === "k") { const k = +sv.slice(1); rows.sort((a, b) => (R(a, k) ?? 1e9) - (R(b, k) ?? 1e9)); }
   else rows.sort((a, b) => avg(a) - avg(b));
-  return { rows, K, R, N, avg };
+  return { rows, base, K, R, N, avg };
 }
 function renderStocks() {
-  const { rows, K, R, N, avg } = stockRows(), show = $("fShow").value, scope = $("fScope").value;
+  const { rows, base, K, R, N, avg } = stockRows(), show = $("fShow").value, scope = $("fScope").value;
+  $("winStat").innerHTML = '<span class="mk">코스닥을 이긴 종목</span>' + K.map((k) => {
+    const v = base.filter((s) => s.ex[k] != null), n = v.filter((s) => s.ex[k] > 0).length;
+    return `<span class="ws"><span class="mk">${H[k]}</span> <b>${n.toLocaleString()}</b> / ${v.length.toLocaleString()} <span class="mk">(${v.length ? (n / v.length * 100).toFixed(0) : 0}%)</span></span>`;
+  }).join("");
   const cols = show === "both" ? 2 : 1;
   let h = '<tr><th class="nm lbl" rowspan="2">종목</th><th rowspan="2">섹터</th><th rowspan="2">시총(십억원)</th>'
     + (K.length > 1 ? '<th rowspan="2">평균 순위</th>' : "")
