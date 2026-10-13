@@ -13,6 +13,7 @@ import io
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import requests
@@ -129,7 +130,18 @@ def daily_chart(symbol: str, count: int) -> pd.Series:
         if len(p) >= 5 and p[4] not in ("", "null"):
             d.append(p[0])
             c.append(float(p[4]))
-    return pd.Series(c, index=pd.to_datetime(d, format="%Y%m%d"), name=symbol)
+    return _drop_open_session(pd.Series(c, index=pd.to_datetime(d, format="%Y%m%d"), name=symbol))
+
+
+KST = timezone(timedelta(hours=9))
+
+
+def _drop_open_session(s: pd.Series) -> pd.Series:
+    """장중(평일 15:40 KST 전)에 받으면 맨 끝 값이 '오늘 현재가'라서 마감 전 가격이 섞인다. 그 날짜 봉은 뺀다."""
+    now = datetime.now(KST)
+    if len(s) and now.weekday() < 5 and (now.hour, now.minute) < (15, 40) and s.index[-1].date() == now.date():
+        return s.iloc[:-1]
+    return s
 
 
 def fetch(top_n: int = 1000, buffer: int = 60, count: int = 300, workers: int = 8):

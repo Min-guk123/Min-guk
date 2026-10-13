@@ -33,9 +33,14 @@ def load_cache():
     return P, I, bio, d
 
 
+def _fresh(cache_file, *deps):
+    """캐시가 원본(일봉 캐시·지표 정의 코드)보다 새것일 때만 재사용. 데이터를 새로 받으면 자동으로 다시 계산한다."""
+    return os.path.exists(cache_file) and all(os.path.getmtime(cache_file) >= os.path.getmtime(d) for d in deps if os.path.exists(d))
+
+
 def get_features():
     f = os.path.join(CACHE, "features_long_v2.pkl")
-    if os.path.exists(f):
+    if _fresh(f, os.path.join(CACHE, "prices_long.pkl"), os.path.join(os.path.dirname(__file__), "signal_model.py")):
         return pickle.load(open(f, "rb"))
     P, I, bio, d = load_cache()
     F = pd.concat([S.breadth_features(P, I, bio), S.index_features(I)], axis=1)
@@ -100,7 +105,7 @@ def stage_ic(out):
 
 def get_z():
     f = os.path.join(CACHE, "z_long_v2.pkl")
-    if os.path.exists(f):
+    if _fresh(f, os.path.join(CACHE, "features_long_v2.pkl"), os.path.join(CACHE, "prices_long.pkl"), os.path.join(os.path.dirname(__file__), "signal_model.py")):
         return pickle.load(open(f, "rb"))
     F, T, I = get_features()
     Z = S.expanding_z(F)
@@ -603,7 +608,7 @@ def _perf_pack(ts):
 
 
 def stage_report(out):
-    """docs/data/signal_research.json 생성: 대시보드 ④ 탭이 보여주는 모든 연구 결과."""
+    """docs/data/signal_research.json 생성: 대시보드 ⑤ 탭이 보여주는 모든 연구 결과."""
     from signal_pipeline import _clean
     from datetime import datetime
     F, T, I = get_features()

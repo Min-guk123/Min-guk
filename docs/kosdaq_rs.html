@@ -77,7 +77,7 @@ tr.mrow td.nm { background: #12151b; font-weight: 500; padding-left: 26px; }
 .mk { font-size: 11px; color: var(--muted); font-weight: normal; }
 .up { color: var(--pos); font-size: 11px; } .dn { color: var(--neg); font-size: 11px; } .eq { color: var(--dim); font-size: 11px; }
 .chip { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line2); color: var(--muted); margin-left: 6px; font-weight: normal; }
-#moreBtn { margin: 12px auto; display: block; background: var(--card); border: 1px solid var(--line2); color: var(--fg2); border-radius: 6px; padding: 8px 20px; cursor: pointer; font-family: inherit; }
+#moreBtn, #ddMore { margin: 12px auto; display: block; background: var(--card); border: 1px solid var(--line2); color: var(--fg2); border-radius: 6px; padding: 8px 20px; cursor: pointer; font-family: inherit; }
 .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin: 6px 0 10px; align-items: center; flex-wrap: wrap; }
 .sq { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
 .ln { width: 16px; height: 2px; display: inline-block; vertical-align: middle; }
@@ -101,7 +101,12 @@ table.heat td:hover { outline: 1px solid var(--fg2); }
 .stat div { font-size: 12px; color: var(--muted); }
 .stat b { display: block; font-size: 20px; color: var(--fg); font-variant-numeric: tabular-nums; font-weight: 600; }
 .err { background: #2a1d1d; border: 1px solid #5c2b2b; color: #ffc9c9; padding: 12px 16px; border-radius: 8px; }
-/* ④ 시그널·숏 비중 */
+/* ④ 최근 낙폭 평균 */
+.cmp { position: relative; display: inline-block; width: 130px; height: 10px; background: var(--line); border-radius: 5px; vertical-align: middle; }
+.cmp i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: var(--s1); opacity: .9; }
+.cmp b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--note); border-radius: 1px; }
+.stat .k b { color: var(--accent); }
+/* ⑤ 시그널·숏 비중 */
 .verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); gap: 12px; max-width: 1200px; margin-bottom: 16px; }
 .vcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
 .vcard .q { font-size: 12px; color: var(--muted); }
@@ -153,7 +158,9 @@ table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
   <b>유니버스</b>: 기준일 코스닥 시가총액 상위 1000종목(스팩·우선주 제외). 매일 다시 뽑으므로 1000위 근처 종목은 들고 날 수 있습니다.
   <b>코스닥비중</b>은 1000종목 시총 합을 100%로 본 섹터 비중입니다. 금액은 십억원 단위입니다.<br>
   <b>섹터</b>: 데이터 모음의 '섹터별 구성 종목' 분류를 먼저 쓰고, 거기 없는 종목은 같은 섹터 체계로 따로 분류했습니다. 코스닥에만 많은 교육주는 '교육' 섹터를 새로 만들었습니다. 분류표는 저장소의 <code>config/sector_map.csv</code>에 있고, 고치면 다음 갱신부터 반영됩니다.<br>
-  <b>수급 확산</b> 탭: 날짜마다 코스닥을 이긴 종목 비율을 다시 계산했습니다. 지수가 오르는데 이 비율이 낮으면 소수 대형주가 끄는 장이고, 비율이 같이 오르면 매수세가 더 많은 종목으로 퍼지는 중입니다. 과거 날짜도 오늘의 1000종목 기준으로 계산합니다.
+  <b>수급 확산</b> 탭: 날짜마다 코스닥을 이긴 종목 비율을 다시 계산했습니다. 지수가 오르는데 이 비율이 낮으면 소수 대형주가 끄는 장이고, 비율이 같이 오르면 매수세가 더 많은 종목으로 퍼지는 중입니다. 과거 날짜도 오늘의 1000종목 기준으로 계산합니다.<br>
+  <b>최근 낙폭 평균</b> 탭: 종목마다 최근 N거래일 중 전일보다 내린 날만 골라 그날 등락률을 평균했습니다(내릴 때 평균 얼마나 내리는가). 코스닥 지수도 같은 방식으로 계산해 옆에 둡니다.<br>
+  <b>시그널·숏 비중</b> 탭: 수급 확산 지표를 평균한 '낙관 점수'로 앞으로의 위험을 가늠하고 숏 비중 가감 폭을 계산합니다(방향 예측은 못 합니다).
 </details>
 
 <div class="sumwrap"><table class="sum" id="sumTable"></table></div>
@@ -162,7 +169,8 @@ table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
   <button data-tab="t1" class="on" id="tabBtn1">① 섹터 상대강도 순위</button>
   <button data-tab="t2" id="tabBtn2">② 종목 상대강도 순위</button>
   <button data-tab="t3" id="tabBtn3">③ 수급 확산</button>
-  <button data-tab="t4" id="tabBtn4">④ 시그널·숏 비중</button>
+  <button data-tab="t4" id="tabBtn4">④ 최근 낙폭 평균</button>
+  <button data-tab="t5" id="tabBtn5">⑤ 시그널·숏 비중</button>
   <a class="dl" href="downloads/kosdaq_rs_latest.xlsx">엑셀 받기 (3시트)</a>
 </div>
 
@@ -239,6 +247,15 @@ table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
 </section>
 
 <section class="tab" id="t4" hidden>
+  <div id="ddState" class="note">낙폭 데이터를 불러오는 중…</div>
+  <div class="grid2" style="margin-bottom:14px"><div class="panel" id="ddTop"></div></div>
+  <div class="filters" id="ddCtl"></div>
+  <div class="count" id="ddCount"></div>
+  <div class="table-wrap"><table class="main"><thead id="ddHead"></thead><tbody id="ddBody"></tbody></table></div>
+  <button id="ddMore" hidden>더 보기</button>
+</section>
+
+<section class="tab" id="t5" hidden>
   <div id="sigState" class="note">시그널 데이터를 불러오는 중…</div>
   <div id="sgVerdict" class="verdicts"></div>
   <div class="grid2">
@@ -330,18 +347,19 @@ function init(data) {
 
   document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
   const hash = (location.hash || "").replace("#", "");
-  showTab(["t1", "t2", "t3", "t4"].includes(hash) ? hash : (store("tab") || "t1"));
+  showTab(["t1", "t2", "t3", "t4", "t5"].includes(hash) ? hash : (store("tab") || "t1"));
   rebuildSort();
   renderAll();
 }
 
 function showTab(t) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
-  ["t1", "t2", "t3", "t4"].forEach((id) => { $(id).hidden = id !== t; });
-  $("perBar").hidden = t === "t3" || t === "t4";
+  ["t1", "t2", "t3", "t4", "t5"].forEach((id) => { $(id).hidden = id !== t; });
+  $("perBar").hidden = t === "t3" || t === "t4" || t === "t5";
   store("tab", t);
   if (t === "t3") renderBreadth();
-  if (t === "t4") renderSignal();
+  if (t === "t4") renderDrawdown();
+  if (t === "t5") renderSignal();
 }
 const ks = () => H.map((_, k) => k).filter((k) => sel[k]);
 function renderAll() { renderSectors(); renderStocks(); }
@@ -570,7 +588,90 @@ function renderHeat() {
   t.onpointerleave = () => { tip.hidden = true; };
 }
 
-/* ---------- ④ 시그널·숏 비중 ---------- */
+/* ---------- ④ 최근 낙폭 평균 ---------- */
+let DD = null, DDR = [], ddLoading = false, ddWin = store("ddWin") || "20", ddPage = 1;
+const DDPER = 100;
+function renderDrawdown() {
+  if (DD || ddLoading) return;
+  ddLoading = true;
+  fetch("data/drawdown.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { DD = d; buildDrawdown(); })
+    .catch((e) => { ddLoading = false; $("ddState").innerHTML = `<div class="err">낙폭 데이터(data/drawdown.json)를 읽지 못했습니다 (${esc(e.message)}). 저장소의 Actions 실행 기록이나 build.py 로그를 확인하세요.</div>`; });
+}
+const ddMinDownDefault = (n) => Math.max(1, Math.round(n * 0.15));   // 내린 날이 너무 적으면 평균이 불안정 (5일→1, 20일→3, 60일→9)
+function buildDrawdown() {
+  const C = DD.cols, ci = (n) => C.indexOf(n);
+  DDR = DD.stocks.map((r) => { const o = { code: r[0], name: r[1], sector: r[2], mcap: r[3], mrank: r[4], w: {} };
+    DD.windows.forEach((n) => { o.w[n] = { nv: r[ci("nv" + n)], nd: r[ci("nd" + n)], ad: r[ci("ad" + n)], wr: r[ci("wr" + n)], cm: r[ci("cm" + n)] }; });
+    return o; });
+  if (!DD.windows.map(String).includes(ddWin)) ddWin = "20";
+  const secs = [...new Set(DDR.map((s) => s.sector))].sort((a, b) => a.localeCompare(b, "ko"));
+  $("ddState").innerHTML = `낙폭 데이터 기준일 <b>${esc(DD.asof)}</b> · 생성 ${esc(DD.generated)} · 종목 ${DDR.length.toLocaleString()}개`;
+  $("ddCtl").innerHTML = `
+    <label>기간 <select id="ddWinSel">${DD.windows.map((n) => `<option value="${n}"${String(n) === ddWin ? " selected" : ""}>최근 ${n}거래일</option>`).join("")}</select></label>
+    <label>검색 <input type="text" id="ddSearch" placeholder="종목명/코드"></label>
+    <label>섹터 <select id="ddSector"><option value="">전체</option>${secs.map((s) => `<option>${esc(s)}</option>`).join("")}</select></label>
+    <label>정렬 <select id="ddSort"><option value="ad">하락일 평균 낙폭 큰 순</option><option value="ad_asc">하락일 평균 낙폭 작은 순</option><option value="wr">하루 최대 낙폭 큰 순</option><option value="cm">기간 수익률 낮은 순</option><option value="nd">하락일 수 많은 순</option><option value="mcap">시가총액 순</option></select></label>
+    <label>하락일 <input type="number" id="ddMinDown" min="0" step="1" value="${ddMinDownDefault(+ddWin)}">일 이상</label>
+    <label>코스닥 대비 <input type="number" id="ddMinRatio" min="0" step="0.5" value="0">배 이상</label>
+    <label><input type="checkbox" id="ddFull" checked> 기간 내내 거래된 종목만</label>
+    <button id="ddCsv">현재 표 CSV 저장</button>`;
+  ["ddWinSel", "ddSearch", "ddSector", "ddSort", "ddMinDown", "ddMinRatio", "ddFull"].forEach((id) => $(id).addEventListener("input", () => {
+    if (id === "ddWinSel") { ddWin = $(id).value; store("ddWin", ddWin); $("ddMinDown").value = ddMinDownDefault(+ddWin); ddTop(); }
+    ddPage = 1; ddTable(); }));
+  $("ddMore").onclick = () => { ddPage++; ddTable(); };
+  $("ddCsv").onclick = ddCsv;
+  ddTop(); ddTable();
+}
+function ddTop() {
+  const n = +ddWin, K = DD.kosdaq[ddWin], M = DD.summary[ddWin], R = DD.roll;
+  const ratio = K.ad ? M.median / K.ad : null;
+  $("ddTop").innerHTML = `<h3>내릴 때 평균 얼마나 내리나 · 최근 ${n}거래일, 내린 날만</h3>
+    <p class="desc">종목마다 최근 ${n}거래일 중 <b>전일보다 내린 날만</b> 골라 그날 등락률을 평균한 값(하락일 평균 낙폭)입니다. 코스닥 지수도 똑같이 계산해 표의 옆 칸에 두었습니다. 값이 클수록(더 음수) 내릴 때 크게 내리는 종목입니다. 종목은 각자 자기가 내린 날만 평균하므로 코스닥이 내린 날과 같지 않고, 지수는 여러 종목이 섞여 있어서 개별 종목보다 값이 작게 나오는 것이 보통입니다. 요약 통계는 기간 내내 가격이 있던 종목만으로 계산합니다(신규상장·거래정지 종목은 표에서 * 표시).</p>
+    <div class="stat">
+      <div class="k">코스닥 하락일 평균 낙폭<b>${sgn(K.ad, 2)}</b>${K.nd} / ${K.nv}일 내림</div>
+      <div class="k">코스닥 하루 최대 낙폭<b>${sgn(K.wr, 2)}</b>${n}일 수익률 ${sgn(K.cm, 1)}</div>
+      <div>종목 중앙값(하락일 평균)<b>${sgn(M.median, 2)}</b>코스닥의 ${ratio == null ? "-" : ratio.toFixed(1) + "배"} · 중간 50% 범위 ${sgn(M.p25, 1)} ~ ${sgn(M.p75, 1)}</div>
+      <div>코스닥보다 더 크게 내린 종목<b>${M.worse.toLocaleString()} <span class="mk">/ ${M.n.toLocaleString()}</span></b>${(M.worse / M.n * 100).toFixed(0)}%</div>
+    </div>
+    <div class="legend"><span><span class="ln" style="background:var(--accent)"></span> 코스닥</span><span><span class="ln" style="background:var(--note)"></span> 종목 중앙값</span><span>· 날짜마다 그날까지 최근 ${R.n}거래일의 하락일 평균(롤링). 위쪽(0에 가까울수록) 조용하고 아래쪽일수록 내릴 때 크게 내렸다는 뜻입니다.</span></div>
+    <div class="chart" id="ddChart"></div>`;
+  const lo = Math.min(...R.kosdaq.filter((v) => v != null), ...R.median.filter((v) => v != null)), step = niceStep(Math.abs(lo) / 4), ticks = [];
+  for (let t = 0; t >= lo * 1.1; t -= step) ticks.push(+t.toFixed(6));
+  tsChart($("ddChart"), R.dates, [{ title: `하락일 평균 낙폭 (최근 ${R.n}거래일 롤링)`, h: 200, min: Math.min(lo * 1.1, ticks[ticks.length - 1]), max: 0, ticks, fmt: (v) => (v * 100).toFixed(1) + "%",
+    series: [{ v: R.median, c: "var(--note)", w: 1.8 }, { v: R.kosdaq, c: "var(--accent)", w: 2 }] }],
+    { label: "코스닥과 종목 중앙값의 하락일 평균 낙폭 추이", tip: (i) => `<div><span class="ln" style="background:var(--accent)"></span> 코스닥 <b>${pct(R.kosdaq[i], 2)}</b></div><div><span class="ln" style="background:var(--note)"></span> 종목 중앙값 <b>${pct(R.median[i], 2)}</b></div><div class="mk">종목 중간 50% ${pct(R.p25[i], 1)} ~ ${pct(R.p75[i], 1)}</div>` });
+}
+function ddRows() {
+  const K = DD.kosdaq[ddWin], q = $("ddSearch").value.trim().toLowerCase(), sec = $("ddSector").value, minD = +$("ddMinDown").value || 0, minR = +$("ddMinRatio").value || 0, sort = $("ddSort").value;
+  let rows = DDR.filter((s) => (!sec || s.sector === sec) && (!q || s.name.toLowerCase().includes(q) || s.code.includes(q)) && s.w[ddWin].nd >= minD && (!$("ddFull").checked || s.w[ddWin].nv >= +ddWin));
+  if (minR > 0 && K.ad) rows = rows.filter((s) => s.w[ddWin].ad != null && s.w[ddWin].ad / K.ad >= minR);
+  const val = { ad: (s) => s.w[ddWin].ad, ad_asc: (s) => s.w[ddWin].ad, wr: (s) => s.w[ddWin].wr, cm: (s) => s.w[ddWin].cm, nd: (s) => -s.w[ddWin].nd, mcap: (s) => s.mrank }[sort];
+  const dir = sort === "ad_asc" ? -1 : 1;
+  rows.sort((a, b) => { const x = val(a), y = val(b); if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return dir * (x - y); });
+  return { rows, K };
+}
+function ddTable() {
+  const n = +ddWin, { rows, K } = ddRows(), vis = rows.slice(0, ddPage * DDPER);
+  const scale = Math.abs(K.ad || 0.01) * 5, kx = "20.0";   // 막대 눈금: 코스닥의 5배 = 가득, 주황 선(코스닥) = 20% 지점
+  $("ddHead").innerHTML = `<tr><th class="nm lbl">종목</th><th>섹터</th><th>시총(십억원)</th><th>하락일</th><th>하락일 평균 낙폭</th><th>코스닥 대비 <span class="mk">(주황 선 = 코스닥, 가득 = 5배)</span></th><th>코스닥 하락일 평균</th><th>하루 최대 낙폭</th><th>${n}일 수익률</th></tr>`;
+  $("ddBody").innerHTML = vis.map((s) => { const w = s.w[ddWin], ratio = (w.ad != null && K.ad) ? w.ad / K.ad : null;
+    const bar = w.ad == null ? "" : `<span class="cmp" title="${esc(s.name)} ${pct(w.ad, 2)} · 코스닥 ${pct(K.ad, 2)}"><i style="width:${Math.min(100, Math.abs(w.ad) / scale * 100).toFixed(1)}%"></i><b style="left:${kx}%"></b></span>`;
+    return `<tr><td class="nm"><a href="https://finance.naver.com/item/main.naver?code=${s.code}" target="_blank" rel="noopener">${esc(s.name)}</a> <span class="mk">${s.code}</span></td>`
+      + `<td class="lbl">${esc(s.sector)}</td><td>${fmt1(s.mcap)} <span class="mk">#${s.mrank}</span></td>`
+      + `<td>${w.nd} / ${w.nv}${w.nv < n ? ' <span class="mk" title="가격이 있던 거래일이 적습니다(신규상장·거래정지)">*</span>' : ""}</td>`
+      + `<td>${sgn(w.ad, 2)}</td><td>${bar} <span class="mk">${ratio == null ? "-" : ratio.toFixed(1) + "배"}</span></td><td>${sgn(K.ad, 2)}</td><td>${sgn(w.wr, 1)}</td><td>${sgn(w.cm, 1)}</td></tr>`; }).join("")
+    || `<tr><td colspan="9" class="note">조건에 맞는 종목이 없습니다.</td></tr>`;
+  $("ddCount").textContent = `${rows.length.toLocaleString()}종목 중 ${vis.length.toLocaleString()}개 표시 · 최근 ${n}거래일 · 코스닥 하락일 평균 ${pct(K.ad, 2)} (${K.nd}/${K.nv}일 내림)`;
+  $("ddMore").hidden = vis.length >= rows.length;
+}
+function ddCsv() {
+  const { rows, K } = ddRows(), n = ddWin;
+  download(`kosdaq_drawdown_${n}d_${DD.asof}.csv`, [["코드", "종목", "섹터", "시총(십억원)", "하락일수", "거래일수", "하락일 평균 낙폭(%)", "코스닥 하락일 평균(%)", "코스닥 대비(배)", "하루 최대 낙폭(%)", `${n}일 수익률(%)`],
+    ...rows.map((s) => { const w = s.w[ddWin]; return [s.code, s.name, s.sector, s.mcap, w.nd, w.nv, p4(w.ad), p4(K.ad), (w.ad != null && K.ad) ? (w.ad / K.ad).toFixed(2) : "", p4(w.wr), p4(w.cm)]; })]);
+}
+
+/* ---------- ⑤ 시그널·숏 비중 ---------- */
 let SG = null, RS = null, sgLoading = false, sgBase = store("sgBase") || "중립", sgRange = store("sgRange") || "all", sgPeriod = "all";
 const QL = ["하위 20%", "20~40%", "40~60%", "60~80%", "상위 20%"];
 const QC = ["#ff922b", "#ffc078", "#868e96", "#69db7c", "#38d9a9"];

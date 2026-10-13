@@ -23,12 +23,13 @@
 | `data/snapshots/` | 날짜별 섹터/종목 결과 기록 |
 | `.github/workflows/daily.yml` | 평일 16:20 KST 자동 실행 |
 | `scripts/watch_excel.py` | 엑셀 저장을 감지해 자동 갱신 + GitHub 업로드 (아래 '엑셀 자동 갱신') |
-| `scripts/signal_model.py` | ④ 탭: 수급 확산 지표·낙관 점수·숏 비중 함수 |
-| `scripts/signal_pipeline.py` | ④ 탭: 매일 갱신 때 시그널 계산 → `docs/data/signal.json` |
+| `scripts/drawdown_stats.py` | ④ 탭(최근 낙폭 평균): 종목·코스닥의 '내린 날만' 평균 낙폭 → `docs/data/drawdown.json` |
+| `scripts/signal_model.py` | ⑤ 탭: 수급 확산 지표·낙관 점수·숏 비중 함수 |
+| `scripts/signal_pipeline.py` | ⑤ 탭: 매일 갱신 때 시그널 계산 → `docs/data/signal.json` |
 | `scripts/backfill_history.py` | (한 번) 네이버에서 12년치 일봉 캐시 받기 (`data/cache/`, git 제외) |
 | `scripts/make_feature_history.py` | (한 번) 일봉 캐시 → `data/feature_history.csv` 만들기 |
 | `scripts/research_signal.py` | 연구(검증) → `docs/data/signal_research.json` (`report` 단계) |
-| `config/signal_params.json` | ④ 탭 파라미터(가감 폭, 평활, 비용, 기준 숏 비중) |
+| `config/signal_params.json` | ⑤ 탭 파라미터(가감 폭, 평활, 비용, 기준 숏 비중) |
 | `data/feature_history.csv` | 수급 확산 지표 이력 (2014~, 매일 갱신 때 이어 붙음) |
 
 ## 처음 올리는 순서 (10분)
@@ -82,7 +83,14 @@ python scripts/build.py --source dataguide --file "코스닥 분류.xlsx"
 3. `powershell -ExecutionPolicy Bypass -File install_autostart.ps1` — 로그인 때마다 감시 프로그램이 자동으로 켜집니다(관리자 권한 불필요).
    수동 실행은 `start_watcher.bat`, 한 번만 갱신하려면 `python scripts/watch_excel.py --once`.
 
-## ④ 시그널·숏 비중 탭
+## ④ 최근 낙폭 평균 탭
+
+종목마다 최근 N거래일(5·10·20·40·60) 중 **전일보다 내린 날만** 골라 그날 등락률을 평균한 값(= 내릴 때 평균 얼마나 내리는가)과,
+코스닥 지수의 같은 값을 나란히 보여줍니다. 종목은 각자 자기가 내린 날만 평균하므로 코스닥이 내린 날과 같지 않습니다.
+가격이 N거래일 모두 있는 종목만 비교하는 것이 기본이고(신규상장·거래정지 종목은 끌 수 있음), 날짜별 20거래일 롤링 추이(코스닥 vs 종목 중앙값)도 있습니다.
+`build.py` 가 돌 때마다 `docs/data/drawdown.json` 을 다시 씁니다.
+
+## ⑤ 시그널·숏 비중 탭
 
 수급 확산 지표 16개(ADR, 코스닥을 이긴 종목 비율, 이동평균 위 종목 비율, 신고가−신저가, 동일가중−지수 괴리)를 평균해
 '낙관 점수'(0~100)를 만들고, 밸류에이션 룰이 정한 기준 숏 비중(저평가 50 · 중립 75 · 고평가 100%)에 ±amp 를 가감합니다.
@@ -98,7 +106,7 @@ python scripts/research_signal.py report    # docs/data/signal_research.json (�
 ```
 
 이후에는 `build.py` 가 돌 때마다 최근 지표를 이어 붙이고 `docs/data/signal.json` 을 다시 씁니다
-(엑셀 모드에서는 엑셀보다 최신인 날짜를 네이버에서 보충하며, 실패해도 무시).
+(엑셀 모드에서는 엑셀보다 최신인 날짜를 네이버에서 보충하며, 실패해도 무시. 장중(평일 15:40 전)에 받으면 마감 전인 오늘 봉은 자동으로 뺍니다).
 `config/signal_params.json` 의 `amp` 를 키우면(예: 0.25) 더 강하게 가감하고, `cost` 는 숏 100%를 바꿀 때의 비용입니다.
 파라미터는 매일 다시 최적화하지 않으므로 분기마다 `research_signal.py report` 로 재검증하세요.
 

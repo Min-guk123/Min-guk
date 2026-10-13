@@ -137,11 +137,15 @@ def run(prices, index, res, source: str, topup: bool = True) -> dict | None:
     new = _features(prices, index, codes, bio_codes)
     merged = _merge(hist, new)
     last_panel = new[new[CORE].notna().all(axis=1)].index.max()
+    end = last_panel if pd.notna(last_panel) else merged[CORE].dropna().index.max()
     if topup and source == "dataguide":
         extra = _naver_topup(codes, bio_codes)
-        if extra is not None and last_panel is not pd.NaT:
+        if extra is not None and pd.notna(last_panel):
             merged = _merge(merged, extra, only_after=last_panel)
-    merged = merged.loc[:merged[CORE].dropna().index.max()]
+            ok = extra[extra[CORE].notna().all(axis=1)]
+            if len(ok):
+                end = max(end, ok.index.max())
+    merged = merged.loc[:end]      # 이번 실행에서 확인한 날짜까지만(예전 실행이 남긴 장중 값 등은 잘라낸다)
     merged.round(6).to_csv(HIST, encoding="utf-8", index_label="date")
 
     feats = P["features"]
