@@ -193,11 +193,20 @@ def write_excel(res, path):
     wb.save(path)
 
 
+def local_cfg() -> dict:
+    p = os.path.join(BASE, "config", "local.json")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8-sig") as f:
+            return json.load(f)
+    return {}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", choices=["naver", "dataguide"], default="naver")
     ap.add_argument("--file", help="DataGuide 엑셀 경로(--source dataguide)")
     ap.add_argument("--top", type=int, default=1000)
+    ap.add_argument("--op", help="영업이익 추정치 엑셀(코스닥 데이터_v5 형식). 없으면 config/local.json 의 op_path")
     args = ap.parse_args()
 
     if args.source == "dataguide":
@@ -223,15 +232,41 @@ def main():
     keep = ["code", "name", "sector", "mcap_rank", "mcap"] + [c for c in res["stock"].columns if c.startswith(("r_", "ex_"))]
     res["stock"][keep].to_csv(snap + "_stock.csv", index=False, encoding="utf-8-sig")
 
+    caps = prices.attrs.get("caps")          # 엑셀 일별 시총(없으면 None)
     try:  # 최근 낙폭 평균(④ 탭)
         import drawdown_stats as DS
         DS.write(DS.compute(prices, index, res["stock"]), os.path.join(BASE, "docs", "data", "drawdown.json"))
     except Exception as e:  # noqa: BLE001
         print(f"[drawdown] 낙폭 평균 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
 
+    long = None
+    try:  # 장기 가격 이력(엑셀 + 네이버 12년) - ⑥ 섹터 이평선 위 비율, ⑦ 시장 국면 점수, ⑤ 시그널이 함께 쓴다
+        import longdata as LD
+        Px, Ix = E.align(prices, index)
+        long = LD.load_long(Px, Ix, res["stock"]["code"].tolist())
+        print(f"[longdata] {long[2]['source']} · {long[0].shape[1]}종목 x {long[0].shape[0]}일 ({long[0].index[0].date()} ~ {long[0].index[-1].date()})")
+    except Exception as e:  # noqa: BLE001
+        print(f"[longdata] 장기 이력 준비 실패(⑥⑦ 건너뜀): {type(e).__name__}: {e}")
+
+    if long is not None:
+        try:  # 섹터 이평선 위 비율(⑥ 탭)
+            import sector_ma as SM
+            SM.write(SM.compute(long[0], long[1], res["stock"], caps_actual=caps), os.path.join(BASE, "docs", "data", "sector_ma.json"))
+        except Exception as e:  # noqa: BLE001
+            print(f"[sector_ma] 섹터 이평선 위 비율 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
+        try:  # 시장 국면 점수(⑦ 탭)
+            import market_phase as MP
+            op_path = args.op or local_cfg().get("op_path")
+            pl = MP.run(long[0], long[1], res["stock"], caps, op_path, os.path.join(BASE, "data", "valuation_history.csv"),
+                        os.path.join(BASE, "docs", "data", "market_phase.json"))
+            nw = pl["now"]
+            print(f"[market_phase] {nw['date']} 국면 {pl['phases'][nw['phase'] - 1]['name'] if nw['phase'] else '-'} · 점수 {nw['score']} (낮음<{nw['lo']} 높음>{nw['hi']})")
+        except Exception as e:  # noqa: BLE001
+            print(f"[market_phase] 시장 국면 점수 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
+
     try:  # 수급 확산 시그널(⑤ 탭). 실패해도 위 결과는 이미 저장됐으므로 계속 진행
         import signal_pipeline as SP
-        SP.run(prices, index, res, args.source)
+        SP.run(prices, index, res, args.source, long=long)
     except Exception as e:  # noqa: BLE001
         print(f"[signal] 시그널 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
 

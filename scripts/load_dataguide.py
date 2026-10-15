@@ -61,4 +61,5 @@ def load(path: str):
 
     last = caps.ffill().iloc[-1]
     universe = pd.DataFrame({"code": last.index, "name": [nm[c] for c in last.index], "mcap": last.values})
+    prices.attrs["caps"] = caps          # 일별 시가총액(원) - 섹터 이평선 위 비율의 시총 가중, 밸류 하단 지표가 쓴다
     return prices, index, universe

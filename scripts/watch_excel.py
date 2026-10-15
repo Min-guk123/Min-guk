@@ -23,7 +23,7 @@ BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CONFIG = os.path.join(BASE, "config", "local.json")
 POLL_SEC = 5          # 파일 확인 주기
 SETTLE_SEC = 20       # 마지막 변경 후 이만큼 조용하면 저장이 끝난 것으로 본다
-PUBLISH = ["docs/data", "docs/downloads", "data/snapshots", "data/feature_history.csv"]
+PUBLISH = ["docs/data", "docs/downloads", "data/snapshots", "data/feature_history.csv", "data/valuation_history.csv"]
 
 
 def log(msg):

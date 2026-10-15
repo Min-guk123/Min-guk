@@ -124,7 +124,7 @@ def _yearly(w: pd.Series, r: pd.Series, cost: float, start) -> list:
     return out
 
 
-def run(prices, index, res, source: str, topup: bool = True) -> dict | None:
+def run(prices, index, res, source: str, topup: bool = True, long=None) -> dict | None:
     P = load_params()
     st = res["stock"]
     codes = st["code"].tolist()
@@ -139,7 +139,7 @@ def run(prices, index, res, source: str, topup: bool = True) -> dict | None:
     last_panel = new[new[CORE].notna().all(axis=1)].index.max()
     end = last_panel if pd.notna(last_panel) else merged[CORE].dropna().index.max()
     if topup and source == "dataguide":
-        extra = _naver_topup(codes, bio_codes)
+        extra = _features(long[0], long[1], codes, bio_codes) if long is not None else _naver_topup(codes, bio_codes)   # 이미 받은 장기 이력이 있으면 재사용
         if extra is not None and pd.notna(last_panel):
             merged = _merge(merged, extra, only_after=last_panel)
             ok = extra[extra[CORE].notna().all(axis=1)]
