@@ -192,7 +192,8 @@ table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
   <b>최근 낙폭 평균</b> 탭: 종목마다 가장 최근에 내린 날 N일치(전일보다 내린 날만)의 등락률을 평균했습니다(내릴 때 평균 얼마나 내리는가, 데이터 모음 엑셀의 '최근 낙폭 평균' 시트와 같은 계산). 코스닥 지수도 같은 방식으로 계산해 옆에 둡니다.<br>
   <b>시그널·숏 비중</b> 탭: 수급 확산 지표를 평균한 '낙관 점수'로 앞으로의 위험을 가늠하고 숏 비중 가감 폭을 계산합니다(방향 예측은 못 합니다).<br>
   <b>섹터 이평선 위 비율</b> 탭: 섹터별로 이동평균선(10일~200일, 20주) 위에 있는 종목 비율의 추이와 순위. 높을수록 섹터가 강합니다.<br>
-  <b>시장 국면 점수</b> 탭: 밸류 하단 종목 비율(OP밴드) · 공격-방어 상대강도(베타 기준) · 120일선 위 종목 비율을 점수로 만들어 6국면으로 판정합니다.
+  <b>시장 국면 점수</b> 탭: 밸류 하단 종목 비율(OP밴드) · 공격-방어 상대강도(베타 기준) · 120일선 위 종목 비율을 점수로 만들어 6국면으로 판정합니다.<br>
+  <b>위험 예측 점수</b> 탭: 수급 확산 · 섹터 이평선 위 비율 · 최근 낙폭 평균(심해짐 포함)을 입력으로 앞으로 20거래일 코스닥 변동성을 예측하고, 방향·숏 비중 가감에 쓸 수 있는지 표본 외로 검증합니다.
 </details>
 
 <div class="sumwrap"><table class="sum" id="sumTable"></table></div>
@@ -205,6 +206,7 @@ table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
   <button data-tab="t5" id="tabBtn5">⑤ 시그널·숏 비중</button>
   <button data-tab="t6" id="tabBtn6">⑥ 섹터 이평선 위 비율</button>
   <button data-tab="t7" id="tabBtn7">⑦ 시장 국면 점수</button>
+  <button data-tab="t8" id="tabBtn8">⑧ 위험 예측 점수</button>
   <a class="dl" href="downloads/kosdaq_rs_latest.xlsx">엑셀 받기 (3시트)</a>
 </div>
 
@@ -334,6 +336,21 @@ table.plain tr.hl td { background: rgba(77, 171, 247, .10); }
   </div>
 </section>
 
+<section class="tab" id="t8" hidden>
+  <div id="rkState" class="note">위험 예측 데이터를 불러오는 중…</div>
+  <div id="rkVerdict" class="verdicts"></div>
+  <div class="grid2">
+    <div class="panel" id="rkNow"></div>
+    <div class="panel" id="rkChart"></div>
+    <div class="panel" id="rkAbl"></div>
+    <div class="panel" id="rkInd"></div>
+    <div class="panel" id="rkLvl"></div>
+    <div class="panel" id="rkDir"></div>
+    <div class="panel" id="rkHedge"></div>
+    <div class="panel" id="rkMethod"></div>
+  </div>
+</section>
+
 <div class="tip" id="tip" hidden></div>
 
 <script>
@@ -413,21 +430,22 @@ function init(data) {
 
   document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
   const hash = (location.hash || "").replace("#", "");
-  showTab(["t1", "t2", "t3", "t4", "t5", "t6", "t7"].includes(hash) ? hash : (store("tab") || "t1"));
+  showTab(["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"].includes(hash) ? hash : (store("tab") || "t1"));
   rebuildSort();
   renderAll();
 }
 
 function showTab(t) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
-  ["t1", "t2", "t3", "t4", "t5", "t6", "t7"].forEach((id) => { $(id).hidden = id !== t; });
-  $("perBar").hidden = ["t3", "t4", "t5", "t6", "t7"].includes(t);
+  ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"].forEach((id) => { $(id).hidden = id !== t; });
+  $("perBar").hidden = ["t3", "t4", "t5", "t6", "t7", "t8"].includes(t);
   store("tab", t);
   if (t === "t3") renderBreadth();
   if (t === "t4") renderDrawdown();
   if (t === "t5") renderSignal();
   if (t === "t6") renderSectorMa();
   if (t === "t7") renderPhase();
+  if (t === "t8") renderRisk();
 }
 const ks = () => H.map((_, k) => k).filter((k) => sel[k]);
 function renderAll() { renderSectors(); renderStocks(); }
@@ -1266,7 +1284,212 @@ function mpNote() {
     <p class="desc"><b>코스닥 자료로 확인한 국면별 이후 수익률</b> (${esc(MPD.start)} ~, 겹치는 구간이라 독립 표본은 훨씬 적습니다):</p>
     <div class="tscroll"><table class="plain"><thead><tr><th class="l">국면</th><th>일수</th><th>이후 20거래일</th><th>오른 비율</th><th>이후 60거래일</th><th>오른 비율</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="caveat"><b>주의</b><br>국면이 이후 지수를 일관되게 맞히지는 못합니다. 위 표에서도 ① 반등시작 뒤 20거래일 평균은 ${p(S1.f20)}, ④ 고점 뒤는 ${p(S4.f20)}처럼 국면 이름과 이후 수익률이 순서대로 맞지 않습니다. <b>대략적인 위치를 보는 용도</b>이지 매매 신호가 아닙니다. 특히 ④ 고점 판정 뒤에도 지수가 더 오른 경우가 많아 매도 신호로 쓰면 안 됩니다.<br>
-      이 탭은 참고 대시보드의 '시장 국면 점수' 방식을 코스닥 종목 1000개로 옮긴 것입니다. 원본의 중소형 지수 추세, 대응 단계·취약 신호는 만들지 않았습니다. 섹터·밸류 데이터는 현재 상장 종목 기준이라 과거 구간은 살아남은 종목 위주입니다. 밸류 하단은 영업이익 추정치 이력이 짧아(2025-06~) 3년 하위 10% 기준을 그대로 적용하지 못했습니다. DataGuide에서 같은 형식으로 더 긴 이력을 받아 <code>op_path</code> 엑셀을 바꾸고 <code>op_band.py</code>의 MIN_OBS를 늘리면 원래 정의에 가까워집니다.</div>`;
+      이 점수의 이후 수익률·변동성 예측력은 ⑧ 탭에서 같은 표본 외 구간으로 따로 재봤습니다(⑧ 방향 표의 마지막 행, 약했습니다). 이 탭은 참고 대시보드의 '시장 국면 점수' 방식을 코스닥 종목 1000개로 옮긴 것입니다. 원본의 중소형 지수 추세, 대응 단계·취약 신호는 만들지 않았습니다. 섹터·밸류 데이터는 현재 상장 종목 기준이라 과거 구간은 살아남은 종목 위주입니다. 밸류 하단은 영업이익 추정치 이력이 짧아(2025-06~) 3년 하위 10% 기준을 그대로 적용하지 못했습니다. DataGuide에서 같은 형식으로 더 긴 이력을 받아 <code>op_path</code> 엑셀을 바꾸고 <code>op_band.py</code>의 MIN_OBS를 늘리면 원래 정의에 가까워집니다.</div>`;
+}
+
+
+/* ---------- ⑧ 위험 예측 점수 ---------- */
+let RK = null, rkLoading = false, rkRange = store("rkRange") || "756";
+function renderRisk() {
+  if (RK || rkLoading) return;
+  rkLoading = true;
+  fetch("data/risk_score.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { RK = d; buildRisk(); })
+    .catch((e) => { rkLoading = false; $("rkState").innerHTML = `<div class="err">위험 예측 데이터(data/risk_score.json)를 읽지 못했습니다 (${esc(e.message)}). build.py 로그를 확인하세요.</div>`; });
+}
+const rkCol = (l) => RK.level_defs[l].color;
+const rkLv = (l) => RK.level_defs[l].name;
+const rkRgba = (l, a) => { const h = rkCol(l); return `rgba(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)},${a})`; };
+const rkFmt = (v, f) => v == null ? "-" : f === "pct" ? (v * 100).toFixed(1) + "%" : f === "pct2" ? (v * 100).toFixed(2) + "%" : f === "spct" ? (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%" : v.toFixed(2);
+const rkP = (p) => p == null ? "-" : p < 0.001 ? "&lt;0.001" : p.toFixed(2);
+const rkIc = (ic, p) => ic == null ? '<span class="na">-</span>' : `<span class="${p != null && p < 0.05 ? "sig" : ""}">${ic > 0 ? "+" : ""}${ic.toFixed(3)}</span> <span class="mk">(${rkP(p)})</span>`;
+const rkPc = (v, d = 1) => v == null ? "-" : (v * 100).toFixed(d) + "%";
+const rkSg = (v, d = 1) => v == null ? "-" : (v > 0 ? "+" : "") + (v * 100).toFixed(d) + "%";
+
+function buildRisk() {
+  const P = RK.params;
+  $("rkState").innerHTML = `기준일 <b>${esc(RK.asof)}</b> · 생성 ${esc(RK.generated)} · 학습 자료 ${esc(RK.data_start)}~ · 표본 외 검증 ${esc(RK.oos_start)}~ (${P.oos_days.toLocaleString()}거래일, 재학습 ${P.refits}회) · 종목 ${RK.now.n_stocks.toLocaleString()}개`;
+  rkVerdict(); rkNow(); rkChartDraw(); rkAbl(); rkInd(); rkLvl(); rkDir(); rkHedge(); rkMethod();
+}
+
+function rkVerdict() {
+  const A = RK.ablation, g = (k) => A.find((r) => r.key === k), har = g("HAR"), full = g("HAR+A+B+C"), a = g("HAR+A"), b = g("HAR+B"), c = g("HAR+C");
+  const dir = RK.direction, mine = dir.slice(1, 6);                                  // 수급 확산 · 섹터 · 낙폭 · 세 묶음 평균 · 학습 모형
+  const theory = mine.flatMap((r) => [5, 20, 60].filter((h) => r["p" + h] != null && r["p" + h] < 0.05 && r["ic" + h] > 0));
+  const dn = dir[0], contra = dn.ic20 != null && dn.ic20 < 0 && dn.p20 != null && dn.p20 < 0.1;
+  const SP = RK.levels_split, dF = SP.first[2].r20 - SP.first[0].r20, dS = SP.second[2].r20 - SP.second[0].r20;
+  const unstable = Math.sign(dF) !== Math.sign(dS) || Math.min(Math.abs(dF), Math.abs(dS)) < 0.4 * Math.max(Math.abs(dF), Math.abs(dS));
+  const H = RK.hedge, h8 = H.filter((r) => r.model.startsWith("⑧")), h5 = H.filter((r) => r.model.startsWith("⑤"));
+  const shs = (rows) => rows.map((r) => sn(r.d_sharpe, 2)).join(" / ");
+  const bad8 = h8.every((r) => r.d_sharpe < 0), up5 = h5.length > 0 && h5.every((r) => r.d_sharpe > 0), mdd8 = h8.filter((r) => r.d_mdd > 0).length;
+  const f0 = (v) => (v * 100).toFixed(0) + "%";
+  $("rkVerdict").innerHTML = `
+    <div class="vcard"><div class="q">앞으로 20거래일 코스닥이 얼마나 출렁일까요?</div><div class="a good">어느 정도 맞힘 (R² ${full.r2.toFixed(2)})</div>
+      <p>표본 외(${esc(RK.oos_start)}~) 설명력입니다. 코스닥 자신의 최근 변동성만 쓰면 <b>${har.r2.toFixed(2)}</b>인데, 새 지표 세 묶음이 제곱오차를 <b>${f0(full.gain)}</b> 더 줄였습니다(Clark-West t ${(full.cw_t ?? 0).toFixed(1)}, ${full.years}년 중 ${full.wins}년 개선). 더한 정보는 <b>수급 확산</b>(${f0(a.gain)})과 <b>섹터 이평선 위 비율</b>(${f0(b.gain)})에서 왔고, <b>최근 낙폭 평균은 ${f0(c.gain)}</b>로 ${c.gain < 0.01 ? "보탠 것이 없었습니다(코스닥 자신의 변동성과 같은 정보)" : "조금 보탰습니다"}.</p></div>
+    <div class="vcard"><div class="q">오를지 내릴지는요?</div><div class="a bad">${theory.length ? "일부만 맞힘" : "못 맞힘"}</div>
+      <p>수급 확산 · 섹터 이평선 · 낙폭 평균 묶음, 세 묶음 평균, 이 지표들로 학습한 방향 모형 모두 이후 5·20·60일 수익률과의 순위상관(IC)이 ${theory.length ? "이론대로 유의한 칸이 " + theory.length + "개 있습니다(아래 표 확인)" : "<b>이론대로 유의한 칸이 하나도 없었습니다</b>"}. ${contra ? `오히려 <b>예상 위험이 높다고 나온 뒤 수익률이 더 높은</b> 경향(20일 IC ${sn(-dn.ic20, 2)}, p=${rkP(dn.p20)})이 보이는데, ${unstable ? "기간을 반으로 나누면 한쪽에서만 나타나고 " : ""}급락 뒤 반등이 겹친 몇 번의 사례에 기댄 결과라 신호로 쓰기엔 근거가 약합니다.` : ""}</p></div>
+    <div class="vcard"><div class="q">숏 비중 가감에 쓰면 도움이 될까요?</div><div class="a bad">${bad8 ? "도움 안 됨 (오히려 손해)" : "일관된 도움 없음"}</div>
+      <p>밸류에이션 기준 숏 50·75·100%에 ±12.5%p를 가감하고 '같은 평균 숏 고정'과 견준 Sharpe 차이: 위험이 높을 때 숏을 늘리는 ⑧ 규칙 <b>${shs(h8)}</b>${bad8 ? "(세 기준 모두 고정보다 낮음" + (mdd8 ? `, 최대낙폭이 줄어든 기준은 ${h8.length}개 중 ${mdd8}개뿐` : ", 최대낙폭도 줄지 않음") + ")" : ""}, ⑤ 수급 확산 규칙 ${shs(h5)}${up5 ? "(소폭 개선이지만 우연과 구분되지 않음)" : ""}. 그래서 이 점수는 <b>숏 비중 조절용이 아니라, 다음 한 달이 얼마나 출렁일지 보는 온도계</b>로만 쓰세요.</p></div>`;
+}
+
+function rkNow() {
+  const N = RK.now, lv = RK.level_defs[N.level], base = N.vol_base, ratio = N.vol / base;
+  const chg = N.change20, trend = chg == null ? "" : Math.abs(chg) < 13 ? "비슷한 수준" : chg > 0 ? "커지는 중" : "줄어드는 중";
+  const bars = N.contrib.map((c) => {
+    const ln = Math.log(c.mult), w = Math.min(50, Math.abs(ln) / Math.log(2) * 50);
+    return `<div class="hb"><div class="hl">${esc(c.name)}</div><div class="hz2"><span style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)"></span><i class="${ln >= 0 ? "pb" : "nb"}" style="left:${ln >= 0 ? 50 : 50 - w}%;width:${Math.max(0.6, w)}%"></i></div><div class="hv ${ln >= 0 ? "pos" : "neg"}">×${c.mult.toFixed(2)}</div></div>`;
+  }).join("");
+  const tile = (name, v, v20, tip) => `<div style="margin:6px 0"><div class="mk">${name} <span title="${esc(tip)}">ⓘ</span></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:20px;min-width:34px">${v ?? "-"}</b><span class="mbar" style="width:110px"><i style="width:${v ?? 0}%;background:var(--accent)"></i></span><span class="mk">20일 전 ${v20 ?? "-"}</span></div></div>`;
+  const grp = { D: "코스닥 자신", A: "수급 확산", B: "섹터 이평선 위 비율", C: "최근 낙폭 평균" };
+  let last = "", rows = "";
+  N.inputs.forEach((r) => {
+    if (r.group !== last) { last = r.group; rows += `<tr><td class="l" colspan="3" style="color:var(--note);padding-top:10px">${grp[r.group]}</td></tr>`; }
+    const z = r.z, zc = z == null ? "" : Math.abs(z) >= 1.5 ? "sig" : "";
+    rows += `<tr><td class="l">${esc(r.label)}</td><td>${rkFmt(r.v, r.fmt)}</td><td class="${zc}">${z == null ? "-" : (z > 0 ? "+" : "") + z.toFixed(1)}</td></tr>`;
+  });
+  const rec = RK.recent.map((r) => `<tr><td class="l">${esc(r.date.slice(2))}</td><td>${r.kosdaq.toLocaleString("ko-KR")} <span class="${r.ret > 0 ? "pos" : "neg"}">${rkSg(r.ret, 1)}</span></td><td>${r.vol.toFixed(1)}%</td><td>${r.score.toFixed(0)}</td><td><span class="sq" style="background:${rkCol(r.level)}"></span> ${rkLv(r.level)}</td></tr>`).join("");
+  $("rkNow").innerHTML = `<h3>지금 (${esc(N.date)})</h3>
+    <div class="sgnow">
+      <div>
+        <div style="margin:4px 0"><span class="pill" style="background:${lv.color}">위험 ${esc(lv.name)}</span></div>
+        <div class="big" style="margin-top:8px">${N.score.toFixed(0)}<small>/ 100 위험 점수</small></div>
+        <div class="kv"><div>예상 변동성(연율)<b>${N.vol.toFixed(1)}%</b></div><div>하루 평균 등락폭<b>±${N.vol_daily.toFixed(1)}%</b></div><div>평소 대비<b>×${ratio.toFixed(2)}</b></div></div>
+        <div class="mk" style="line-height:1.8">평소 = 학습 구간 평균 ${base.toFixed(1)}% · 최근 20일 실제 변동성 ${N.vol_now20.toFixed(1)}% · 지수 변동성만 쓴 예상 ${N.vol_har.toFixed(1)}%<br>
+        20일 전보다 예상 변동성 <b>${chg == null ? "-" : (chg > 0 ? "+" : "") + chg.toFixed(0) + "%"}</b> ${trend ? "(" + trend + ")" : ""}<br>
+        코스닥 ${N.kosdaq.toLocaleString("ko-KR")} · 1달 ${rkSg(N.kosdaq_1m)} · 250일 고점 대비 ${rkSg(N.kosdaq_dd250)}</div>
+        <div class="mk" style="margin-top:10px">최근 30거래일 위험 수준(왼쪽이 과거)</div>
+        <div class="strip">${N.strip.map((l, i) => `<i style="background:${rkCol(l)}" title="${esc(N.strip_dates[i])} · ${esc(rkLv(l))}"></i>`).join("")}</div>
+        ${RK.changed ? `<div class="mk" style="margin-top:8px">마지막 수준 변경 ${esc(RK.changed.date)} (${esc(rkLv(RK.changed.from))} → ${esc(rkLv(RK.changed.to))}, ${RK.changed.days}거래일째)</div>` : ""}
+      </div>
+      <div>
+        <h4 style="margin:0 0 4px;font-size:13px;color:var(--fg2)">지금의 예상 변동성을 키우는/줄이는 요인</h4>
+        <div class="mk" style="margin-bottom:4px">평소(×1.00)에 곱해지는 배수입니다. 빨강 = 변동성을 키우는 쪽.</div>
+        <div class="hbars">${bars}</div>
+        <div class="mk" style="margin-top:6px">${N.contrib[0].mult > 1.2 ? "지금의 높은 예상 변동성은 대부분 코스닥 자신의 최근 큰 등락에서 옵니다. " : ""}수급 확산·섹터·낙폭 지표의 추가 효과는 ${N.contrib.slice(1).map((c) => "×" + c.mult.toFixed(2)).join(" · ")} 정도입니다.</div>
+        <h4 style="margin:14px 0 2px;font-size:13px;color:var(--fg2)">묶음별 점수 (그 시점까지 이력 중 위치, 0~100)</h4>
+        ${tile("수급 확산 (높을수록 넓게 오르는 중)", N.gA, N.gA_20, "수급 확산 16개 지표의 평균 낙관 점수(⑤ 탭과 같음)의 백분위")}
+        ${tile("섹터 이평선 위 비율 (높을수록 강함)", N.gB, N.gB_20, "섹터 이평선 위 비율 묶음(강한 섹터 +, 약한 섹터 -)의 백분위")}
+        ${tile("낙폭 평균 (높을수록 낙폭이 얕음)", N.gC, N.gC_20, "최근 낙폭 평균·심해짐 지표(클수록 비관)의 부호를 뒤집은 백분위")}
+      </div>
+    </div>
+    <h3 style="margin-top:16px">지금 들어간 지표 값 <span class="mk">(오른쪽 = 지금까지 평균 대비 표준편차 배수, 굵은 파란색은 ±1.5 이상)</span></h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">지표</th><th>현재 값</th><th>표준화</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <h3 style="margin-top:16px">최근 12거래일</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">날짜</th><th>코스닥(전일비)</th><th>예상 변동성</th><th>위험 점수</th><th>수준</th></tr></thead><tbody>${rec}</tbody></table></div>`;
+}
+
+function rkChartDraw() {
+  const D = RK, n0 = D.dates.length, take = rkRange === "all" ? n0 : Math.min(n0, +rkRange), a = n0 - take, sl = (x) => x.slice(a);
+  const dates = sl(D.dates), kos = sl(D.kosdaq), lvl = sl(D.level), vol = sl(D.vol), har = sl(D.vol_har), real = sl(D.vol_real), sc = sl(D.score), gA = sl(D.gA), gB = sl(D.gB), gC = sl(D.gC);
+  const shade = []; let st = 0;
+  for (let i = 1; i <= lvl.length; i++) { if (i === lvl.length || lvl[i] !== lvl[st]) { if (lvl[st] > 0) shade.push({ a: st, b: Math.min(i, lvl.length - 1), c: rkRgba(lvl[st], lvl[st] === 2 ? 0.20 : 0.10) }); st = i; } }
+  const lo = Math.min(...kos), hi = Math.max(...kos);
+  const vmax = Math.max(40, Math.ceil(Math.max(...vol.filter((v) => v != null), ...real.filter((v) => v != null), ...har.filter((v) => v != null)) / 20) * 20);
+  const vt = []; for (let t = 0; t <= vmax; t += vmax > 100 ? 40 : 20) vt.push(t);
+  const ranges = [["252", "1년"], ["756", "3년"], ["1260", "5년"], ["all", "전체"]];
+  $("rkChart").innerHTML = `<h3>코스닥과 예상 변동성, 위험 점수 <span class="mk">${esc(dates[0])} ~ ${esc(dates[dates.length - 1])}</span></h3>
+    <p class="desc">위: 코스닥(로그 눈금), 배경색은 위험 수준(빨강 = 높음, 노랑 = 보통). 두 번째: 그날 계산한 앞으로 20일 예상 변동성(굵은 선)과, 실제로 그 뒤 20거래일에 나온 변동성(회색, 최근 20일은 아직 없음). 모든 선은 그날까지의 자료로만 만든 값(표본 외)입니다. 세 번째: 예상 변동성의 10일 평균이 그 시점까지 이력 중 어디쯤인지(위험 점수). 아래: 묶음별 점수.</p>
+    <div class="filters"><div class="seg" id="rkRangeSeg">${ranges.map(([k, l]) => `<button data-r="${k}" class="${k === rkRange ? "on" : ""}">${l}</button>`).join("")}</div></div>
+    <div class="legend"><span><span class="ln" style="background:var(--accent)"></span> 예상 변동성</span><span><span class="ln" style="background:#74c0fc;opacity:.7"></span> 지수 변동성만 쓴 예상</span><span><span class="ln" style="background:#adb5bd"></span> 실제(그 뒤 20일)</span><span><span class="ln" style="background:#ffd43b"></span> 위험 점수</span></div>
+    <div class="chart" id="chRk"></div>
+    <div class="legend" style="margin-top:6px"><span><span class="ln" style="background:#63e6be"></span> 수급 확산</span><span><span class="ln" style="background:#ffa94d"></span> 섹터 이평선 위 비율</span><span><span class="ln" style="background:#da77f2"></span> 낙폭 평균(높을수록 얕음)</span></div>`;
+  tsChart($("chRk"), dates, [
+    { title: "코스닥 지수", h: 170, log: true, min: lo * 0.96, max: hi * 1.04, ticks: logTicks(lo, hi), fmt: (v) => v.toLocaleString("ko-KR"), series: [{ v: kos, c: "var(--idx)", w: 1.6 }] },
+    { title: "앞으로 20일 변동성 (연율 %)", h: 130, min: 0, max: vmax, ticks: vt, fmt: (v) => v + "%", series: [{ v: real, c: "#adb5bd", w: 1.2 }, { v: har, c: "#74c0fc", w: 1.1, dash: "3 3" }, { v: vol, c: "var(--accent)", w: 1.8 }] },
+    { title: "위험 점수 (0~100)", h: 90, min: 0, max: 100, ticks: [0, 33, 67, 100], fmt: (v) => v, hlines: [{ y: 33.3, c: "#2f9e44" }, { y: 66.7, c: "#e03131" }], series: [{ v: sc, c: "#ffd43b", w: 1.8 }] },
+    { title: "묶음별 점수 (0~100)", h: 100, min: 0, max: 100, ticks: [0, 50, 100], fmt: (v) => v, hlines: [{ y: 50, c: "var(--dim)" }], series: [{ v: gA, c: "#63e6be", w: 1.3 }, { v: gB, c: "#ffa94d", w: 1.3 }, { v: gC, c: "#da77f2", w: 1.3 }] },
+  ], { label: "코스닥 지수, 예상 변동성, 위험 점수, 묶음별 점수", shade,
+    tip: (i) => `<div><b>${kos[i].toLocaleString("ko-KR")}</b> 코스닥</div><div><b>${vol[i] == null ? "-" : vol[i].toFixed(1) + "%"}</b> 예상 변동성 <span class="mk">(지수만 ${har[i] == null ? "-" : har[i].toFixed(1) + "%"})</span></div><div><b>${real[i] == null ? "-" : real[i].toFixed(1) + "%"}</b> 실제(그 뒤 20일)</div><div><b>${sc[i] == null ? "-" : sc[i].toFixed(0)}</b> 위험 점수 · ${esc(rkLv(lvl[i]))}</div><div class="mk">수급 확산 ${gA[i] ?? "-"} · 섹터 ${gB[i] ?? "-"} · 낙폭 ${gC[i] ?? "-"}</div>` });
+  $("rkRangeSeg").querySelectorAll("button").forEach((b) => { b.onclick = () => { rkRange = b.dataset.r; store("rkRange", rkRange); rkChartDraw(); }; });
+}
+
+function rkAbl() {
+  const A = RK.ablation, g = (k) => A.find((r) => r.key === k), a = g("HAR+A"), b = g("HAR+B"), c = g("HAR+C"), full = g("HAR+A+B+C");
+  const f1 = (v) => (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+  const rows = A.map((r) => `<tr${r.key === "HAR+A+B+C" ? ' class="hl"' : ""}><td class="l">${esc(r.name)}</td><td>${r.r2.toFixed(3)}</td><td>${rkIc(r.ic, r.p)}</td><td class="${r.gain == null ? "" : r.gain > 0.01 ? "good" : r.gain < 0 ? "bad" : ""}">${r.gain == null ? "-" : f1(r.gain)}</td><td>${r.cw_t == null ? "-" : sn(r.cw_t, 1)}</td><td>${r.wins == null ? "-" : r.wins + " / " + r.years}</td></tr>`).join("");
+  const yrs = RK.years.map((y) => `<tr><td class="l">${y.year}${y.n < 200 ? ' <span class="mk">(일부)</span>' : ""}</td><td>${y.n}</td><td>${y.pv.toFixed(1)}%</td><td>${y.rv.toFixed(1)}%</td><td class="${y.r2 > 0 ? "good" : "bad"}">${sn(y.r2, 2)}</td><td class="${y.gain > 0 ? "good" : "bad"}">${f1(y.gain)}</td></tr>`).join("");
+  $("rkAbl").innerHTML = `<h3>새 지표는 얼마나 보태나 <span class="mk">표본 외 ${esc(RK.oos_start)}~ · 목표 = 앞으로 20일 변동성(로그)</span></h3>
+    <p class="desc">모든 행이 같은 기준선(코스닥 자신의 변동성) 위에 한 묶음씩 얹은 것입니다. <b>R²</b> = 과거 평균으로 예측한 것보다 제곱오차가 얼마나 줄었는지(0이면 평균과 같고 1이면 완벽). <b>기준선 대비 개선</b> = 지수 변동성만 쓴 기준선보다 제곱오차가 줄어든 비율, <b>Clark-West t</b> = 그 개선이 우연이 아닌지의 검정(약 2 이상이면 유의, 겹치는 20일 구간을 반영한 HAC). 마지막 열은 연도별로 기준선보다 나았던 해의 수입니다.</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">모형</th><th>R²</th><th>IC (p)</th><th>기준선 대비 개선</th><th>Clark-West t</th><th>나았던 해</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">IC = 예측과 실제 변동성의 순위상관(괄호는 순열 p값). 이 탭의 점수는 굵게 표시한 마지막 행 모형입니다. 묶음별로 더한 정보는 수급 확산 ${f1(a.gain)}, 섹터 이평선 위 비율 ${f1(b.gain)}, 최근 낙폭 평균 ${f1(c.gain)}이고 세 개를 모두 쓰면 ${f1(full.gain)}입니다. ${c.gain < 0.01 ? "<b>낙폭 평균(심해지는지 포함)은 코스닥 자신의 변동성과 같은 정보라 더하는 게 없습니다.</b> 그래도 요청하신 세 묶음을 모두 입력으로 두었고, 릿지 규제가 쓸모없는 지표의 가중치를 줄입니다." : ""}</p>
+    <h3 style="margin-top:14px">연도별</h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">연도</th><th>일수</th><th>예상 평균</th><th>실제 평균</th><th>R²(평균 대비)</th><th>기준선 대비 개선</th></tr></thead><tbody>${yrs}</tbody></table></div>
+    <p class="note">예상 평균은 그해 매일의 예상 변동성(보정 전 중앙값 기준) 평균, 실제 평균은 그 뒤 20일 실제 변동성의 평균입니다. 급락이 있던 해에는 예상이 실제보다 크게 낮았습니다. 위험이 갑자기 터지는 구간은 어떤 방법으로도 미리 크게 잡지 못했습니다.</p>`;
+}
+
+function rkInd() {
+  const grp = { A: "수급 확산", B: "섹터 이평선 위 비율", C: "최근 낙폭 평균" };
+  let last = "", rows = "";
+  RK.indicators.forEach((r) => {
+    if (r.group !== last) { last = r.group; rows += `<tr><td class="l" colspan="3" style="color:var(--note);padding-top:10px">${grp[r.group]}</td></tr>`; }
+    rows += `<tr><td class="l">${esc(r.label)}</td><td>${rkIc(r.ic, r.p)}</td><td>${rkIc(r.pic, r.pp)}</td></tr>`;
+  });
+  const cr = RK.indicators.filter((r) => r.group === "C"), ratio = cr.length ? cr.reduce((s, r) => s + Math.abs(r.pic || 0), 0) / Math.max(1e-9, cr.reduce((s, r) => s + Math.abs(r.ic || 0), 0)) : null;
+  $("rkInd").innerHTML = `<h3>어떤 지표가 변동성을 알려주나 <span class="mk">묶음별 상위 6개 (부분 IC 기준)</span></h3>
+    <p class="desc"><b>IC</b> = 그 지표(표준화)와 앞으로 20일 변동성의 순위상관, <b>부분 IC</b> = 코스닥 자신의 최근 변동성(10·20·60·250일)을 걷어낸 뒤에도 남는 순위상관입니다. 괄호는 순열 p값(굵은 파란색 = 0.05 미만). 음수는 값이 클수록 이후 변동성이 작다는 뜻이고, 낙폭 지표는 값이 클수록(낙폭이 깊을수록) 이후 변동성이 큽니다(양수).</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">지표</th><th>IC (p)</th><th>부분 IC (p)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">'심해지는지'를 직접 보는 지표(20일 전보다 낙폭이 깊어진 종목 비중, 낙폭의 20일 변화, 1년 평균 대비)를 포함해 낙폭 지표는 단독 IC가 높지만, 지수 변동성을 걷어내면 IC가 평균 ${ratio == null ? "-" : (ratio * 100).toFixed(0)}% 수준으로 줄어듭니다(위 표의 낙폭 지표 기준, 평균 낙폭 자체가 변동성의 한 모습이라서). 한 지표씩 본 p값 60여 개 중 일부는 우연히 작게 나올 수 있어(다중비교 미보정) 위 모형 전체의 검정을 더 믿으세요.</p>`;
+}
+
+function rkLvl() {
+  const L = RK.levels, all = RK.all;
+  const row = (r, name) => `<tr><td class="l">${name}</td><td>${r.n.toLocaleString()}</td><td>${r.runs ?? "-"}</td><td>${r.pv == null ? "-" : r.pv.toFixed(1) + "%"}</td><td>${r.rv == null ? "-" : r.rv.toFixed(1) + "%"}</td><td>${rkSg(r.dd)}</td><td>${rkPc(r.big, 0)}</td><td>${sgn(r.r20, 1)}</td><td>${rkPc(r.up20, 0)}</td><td>${sgn(r.r60, 1)}</td></tr>`;
+  const rows = L.map((r) => row(r, `<span class="sq" style="background:${rkCol(r.id)}"></span> 위험 ${esc(rkLv(r.id))}`)).join("") + row(all, "전체");
+  const rows6 = RK.state_stats.map((r) => row(r, `<span class="sq" style="background:${RK.states[r.id - 1].color}"></span> ${esc(RK.states[r.id - 1].name)}`)).join("");
+  const lo = L[0], hi = L[2], SP = RK.levels_split, fi = SP.first, se = SP.second;
+  const volMono = L[0].rv < L[1].rv && L[1].rv < L[2].rv, retHigher = hi.r20 > lo.r20, ddDeeper = hi.dd < lo.dd - 0.01;
+  const dF = fi[2].r20 - fi[0].r20, dS = se[2].r20 - se[0].r20, unstable = Math.sign(dF) !== Math.sign(dS) || Math.min(Math.abs(dF), Math.abs(dS)) < 0.4 * Math.max(Math.abs(dF), Math.abs(dS));
+  const spRows = [0, 1, 2].map((i) => `<tr><td class="l"><span class="sq" style="background:${rkCol(i)}"></span> 위험 ${esc(rkLv(i))}</td><td>${fi[i].n.toLocaleString()}</td><td>${fi[i].runs ?? "-"}</td><td>${fi[i].rv == null ? "-" : fi[i].rv.toFixed(1) + "%"}</td><td>${sgn(fi[i].r20, 1)}</td><td>${se[i].n.toLocaleString()}</td><td>${se[i].runs ?? "-"}</td><td>${se[i].rv == null ? "-" : se[i].rv.toFixed(1) + "%"}</td><td>${sgn(se[i].r20, 1)}</td></tr>`).join("");
+  $("rkLvl").innerHTML = `<h3>위험 수준별 이후 성과 <span class="mk">표본 외 ${esc(RK.start)}~</span></h3>
+    <p class="desc">위험 점수가 33 아래면 낮음, 67 위면 높음, 그 사이는 보통입니다(±3점 이력 현상). 각 수준이었던 날들의 평균입니다. <b>에피소드</b> = 그 수준이 이어진 덩어리 수입니다. 일수는 겹치는 날을 모두 센 것이라, 실제로 확인된 독립 사례는 에피소드 수에 가깝습니다.</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">수준</th><th>일수</th><th>에피소드</th><th>예상 변동성</th><th>실제 이후 20일 변동성</th><th>이후 20일 최대낙폭</th><th>-7% 이상 빠진 비율</th><th>이후 20일 수익률</th><th>오른 비율</th><th>이후 60일 수익률</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <h3 style="margin-top:12px">기간을 반으로 나눠 보면 <span class="mk">${esc(RK.start)} ~ ${esc(SP.split)} / ${esc(SP.split)} ~</span></h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">수준</th><th>전반 일수</th><th>에피소드</th><th>실제 변동성</th><th>이후 20일 수익률</th><th>후반 일수</th><th>에피소드</th><th>실제 변동성</th><th>이후 20일 수익률</th></tr></thead><tbody>${spRows}</tbody></table></div>
+    <div class="caveat"><b>읽는 법</b><br>${volMono ? "변동성은 수준이 높을수록 계단식으로 커집니다(예상대로)." : "변동성이 수준에 따라 단조롭게 커지지는 않았습니다."} ${ddDeeper ? "최대낙폭도 높은 쪽이 더 깊었습니다." : "<b>최대낙폭은 수준별로 뚜렷하게 달라지지 않았습니다</b>(변동성이 커진다고 아래로만 출렁이지는 않기 때문)."} ${retHigher ? `<b>수익률은 오히려 위험이 높다고 나온 구간(${sgn(hi.r20, 1)})이 낮은 구간(${sgn(lo.r20, 1)})보다 높았습니다.</b> 위험이 높다고 나오는 때는 이미 크게 빠진 뒤인 경우가 많고 그 뒤에 반등이 온 사례가 섞여 있기 때문으로 보이며, 그래서 '위험 높음 = 방어'로 읽으면 이 표본에서는 손해였습니다(아래 숏 비중 시험).` : "수익률은 위험 수준과 뚜렷한 관계가 없었습니다."} ${retHigher ? `다만 기간을 반으로 나누면 '높음 − 낮음' 수익률 차이가 전반 ${spp(dF, 1)}, 후반 ${spp(dS, 1)}로 ${unstable ? "한쪽 기간에서만 뚜렷합니다(위 표). 안정적인 관계가 아닙니다." : "비슷했습니다(위 표)."}` : ""}</div>
+    <details class="exp" style="margin-top:10px"><summary>방향(예상 변동성이 20일 전보다 커지는 중/줄어드는 중)까지 나눠 6칸으로 보면</summary>
+      <div class="tscroll"><table class="plain"><thead><tr><th class="l">상태</th><th>일수</th><th>에피소드</th><th>예상 변동성</th><th>실제 이후 20일 변동성</th><th>이후 20일 최대낙폭</th><th>-7% 이상 빠진 비율</th><th>이후 20일 수익률</th><th>오른 비율</th><th>이후 60일 수익률</th></tr></thead><tbody>${rows6}</tbody></table></div>
+      <p class="note">같은 수준 안에서 방향을 나눠도(낮음 ①·②, 보통 ③·④, 높음 ⑤·⑥을 짝지어 비교) 이후 변동성은 거의 같아서, 방향은 정보를 더하지 못한다고 보고 점수와 3단계 수준만 씁니다. 6칸은 참고용입니다. 방향 기준: 평활한 예상 변동성이 20일 전 대비 ±${(RK.params.dir_hyst * 100).toFixed(0)}% 안이면 직전 방향 유지.</p></details>`;
+}
+
+function rkDir() {
+  const rows = RK.direction.map((r, i) => `<tr${i === 0 ? ' class="hl"' : ""}><td class="l">${esc(r.name)}</td><td>${rkIc(r.ic5, r.p5)}</td><td>${rkIc(r.ic20, r.p20)}</td><td>${rkIc(r.ic60, r.p60)}</td><td>${rkIc(r.icv, r.pv_)}</td></tr>`).join("");
+  $("rkDir").innerHTML = `<h3>방향(오를지 내릴지)은 맞히나 <span class="mk">표본 외 ${esc(RK.oos_start)}~</span></h3>
+    <p class="desc">각 점수와 이후 5·20·60거래일 코스닥 수익률의 순위상관(IC)과 순열 p값(괄호, 굵은 파란색 = 0.05 미만)입니다. 점수는 모두 <b>클수록 낙관적</b>이 되도록 맞췄습니다(수급 확산·섹터 이평선 위 비율은 높을수록, 낙폭 평균은 얕을수록, ⑧은 예상 변동성이 낮을수록). 이론대로라면 IC가 +여야 하고, − 는 반대로 움직였다는 뜻입니다. 마지막 열은 같은 점수와 이후 20일 변동성의 IC로, 안정할수록 변동성이 작아야 하니 −가 정상입니다.</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">점수</th><th>이후 5일 수익률</th><th>이후 20일 수익률</th><th>이후 60일 수익률</th><th>이후 20일 변동성</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="caveat"><b>해석 주의</b><br>p가 0.05보다 작은 수익률 칸이 있어도 <b>이론과 반대 방향</b>이거나, 여러 점수·기간을 한꺼번에 본 결과라 우연히 작게 나온 것일 수 있습니다(다중비교 미보정, 겹치는 구간이라 독립 표본은 연 12~13개 정도). '학습한 방향 모형' 행은 이 지표들로 과거 자료만으로 방향을 학습한 모형인데, 새 자료에서 맞히지 못했습니다. 그래서 이 탭은 방향 신호를 주지 않습니다. ⑤ 탭에서 확인한 결론(방향은 못 맞히고 위험은 구분한다)이 지표를 늘려도 바뀌지 않았습니다. 변동성 열은 변동성이 맞는다는 증거이고, 마지막의 ⑦ 행은 기존 시장 국면 점수를 같은 구간으로 재본 참고 값입니다.</div>`;
+}
+
+function rkHedge() {
+  const H = RK.hedge, h8 = H.filter((r) => r.model.startsWith("⑧")), bad8 = h8.length > 0 && h8.every((r) => r.d_sharpe < 0);
+  const HY = RK.hedge_years, n8 = HY.filter((y) => y.r8 > 0).length, n5 = HY.filter((y) => y.r5 > 0).length;
+  const yrows = HY.map((y) => `<tr><td class="l">${y.year}</td><td class="${y.r8 > 0 ? "good" : "bad"}">${spp(y.r8, 2)}</td><td class="${y.r5 > 0 ? "good" : "bad"}">${spp(y.r5, 2)}</td></tr>`).join("");
+  const rows = H.map((r) => `<tr><td class="l">${esc(r.model)}</td><td>${pp(r.base, 0)}</td><td>${pp(r.w_mean, 0)}</td><td class="${r.d_sharpe > 0 ? "good" : "bad"}">${sn(r.d_sharpe, 3)}</td><td class="${r.d_mdd > 0 ? "good" : "bad"}">${spp(r.d_mdd, 1)}</td><td>${sn(r.ir, 2)}</td><td>${pp(r.mdd_sig, 1)}</td><td>${pp(r.mdd_static, 1)}</td></tr>`).join("");
+  $("rkHedge").innerHTML = `<h3>숏 비중 가감에 쓰면 <span class="mk">표본 외 ${esc(RK.oos_start)}~ · 기준 숏 ±12.5%p · 10일 평활 · 비용 10bp</span></h3>
+    <p class="desc">⑤ 탭과 같은 방식입니다. 롱 북이 코스닥과 같이 움직인다(베타 1)고 보고, 밸류에이션 룰의 기준 숏 비중(50·75·100%)에 점수로 ±12.5%p를 더하거나 빼서(한도 50~100%) 순노출 부분의 손익을 <b>같은 평균 숏을 계속 유지한 경우</b>와 비교했습니다. ⑧ 규칙은 위험 점수가 높으면 숏을 늘리고 낮으면 줄입니다. ⑤ 규칙은 수급 확산 낙관 점수가 낮으면 숏을 늘립니다.</p>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">규칙</th><th>기준 숏</th><th>평균 숏</th><th>Sharpe 차이</th><th>최대낙폭 차이</th><th>정보비율</th><th>최대낙폭(가감)</th><th>최대낙폭(고정)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <h3 style="margin-top:12px">연도별로 보면 <span class="mk">기준 숏 75% · 가감한 순수익 − 같은 평균 숏 고정한 순수익</span></h3>
+    <div class="tscroll"><table class="plain"><thead><tr><th class="l">연도</th><th>⑧ 위험 점수 규칙</th><th>⑤ 낙관 점수 규칙</th></tr></thead><tbody>${yrows}</tbody></table></div>
+    <p class="note">${HY.length}개 연도 중 ⑧ 규칙이 고정보다 나았던 해는 <b>${n8}개</b>, ⑤ 규칙은 <b>${n5}개</b>입니다. 급락이 컸던 해에 보호가 되고 평소에는 비용을 치르는 구조인지, 한두 해에 기댄 결과인지 이 표로 가늠하세요(첫·마지막 해는 일부 기간).</p>
+    <div class="caveat"><b>결론</b><br>${bad8 ? `위험이 높다고 나온 때 숏을 늘리는 ⑧ 규칙은 이 기간에 Sharpe가 세 기준 모두 같은 평균 숏을 고정한 것보다 낮았고, 최대낙폭은 ${h8.length}개 기준 중 ${h8.filter((r) => r.d_mdd > 0).length}개에서만 줄었습니다. 급락 뒤 반등 구간에서 숏이 손해를 본 것으로 보입니다. 예상 변동성이 맞는다는 것과 그것으로 수익이 개선된다는 것은 다른 문제였습니다.` : "⑧ 규칙은 기준 숏마다 결과가 엇갈려 일관된 개선이 없었습니다."} 숏 비중은 <b>밸류에이션 룰</b>(고평가 100 · 중립 75 · 저평가 50)을 그대로 쓰시고, 이 점수는 <b>그 한 달의 등락 폭을 가늠</b>하는 용도(포지션 크기·손절 폭·점검 주기)로 쓰시기를 권합니다. ⑤의 소폭 개선도 우연과 구분되지 않습니다. 종목 선택 알파와 인버스 ETF 추적오차·보수는 포함하지 않았습니다.</div>`;
+}
+
+function rkMethod() {
+  const P = RK.params, nf = P.n_features, N = RK.now, cal = RK.all.pv ? (RK.all.rv / RK.all.pv - 1) * 100 : null;
+  $("rkMethod").innerHTML = `<h3>점수 만드는 법과 한계</h3>
+    <p class="desc"><b>맞히려는 것</b>: 오늘 이후 20거래일 동안 코스닥 일별 수익률의 표준편차(연율). 방향은 같은 방법으로 시험했지만 표본 외에서 맞히지 못해(위 표) 이 탭의 목표에서 뺐습니다.</p>
+    <p class="desc"><b>입력</b>: 코스닥 자신의 최근 변동성(10·20·60·250일)을 기준선으로 두고, 그 위에 요청하신 세 묶음을 얹었습니다.
+      <b>수급 확산 ${nf.A}개</b>(ADR 5~60일, 코스닥을 이긴 종목 비율, 20·60·120일선 위 종목 비율, 신고가-신저가, 동일가중-지수 괴리 — ⑤ 탭과 같은 지표, 바이오 제외).
+      <b>섹터 이평선 위 비율 ${nf.B}개</b>(⑥ 탭 정의: 20·60·20주·120·200일선별 섹터 평균, 60% 이상인 강한 섹터 비중, 40% 미만인 약한 섹터 비중, 섹터 간 편차, 20일 변화. 종목 5개 이상 섹터만).
+      <b>최근 낙폭 평균과 심해지는지 ${nf.C}개</b>(④ 탭 정의: 종목별 '가장 최근 하락일 10·20·60일치' 평균의 중앙값, 같은 방식의 코스닥 값, 둘의 배수, 20일 전보다 낙폭이 깊어진 종목 비중, 20일 변화, 1년 평균 대비, 최근 20일 중 내린 날 비중).</p>
+    <p class="desc"><b>모형</b>: 1단계 코스닥 변동성 4개로 선형회귀(HAR), 2단계 위 ${nf.A + nf.B + nf.C}개 지표(그 날짜까지의 평균·표준편차로 표준화, 미래 정보 없음)를 1단계 오차에 릿지 회귀. 규제 강도는 시간 순서 블록 교차검증으로 고릅니다. 매 ${P.step}거래일마다 <b>그 시점에 결과가 확정된 날(예측일 ${P.horizon}거래일 전)까지의 자료만으로</b> 다시 학습해 다음 ${P.step}거래일을 예측하는 walk-forward 방식이라, 표시된 선과 표는 모두 표본 외 값입니다(최근 재학습 ${esc(N.fit_date)}, 학습 표본 ${N.n_train.toLocaleString()}일).</p>
+    <p class="desc"><b>점수</b>: 예상 로그 변동성을 ${P.ema}일 지수이동평균으로 평활해 그 시점까지 이력 중 백분위(0~100)로 바꾼 것이 위험 점수입니다. 예상 변동성(%)은 학습 구간 오차로 평균 기준에 맞게 보정했습니다.</p>
+    <div class="caveat"><b>한계</b><br>
+      · 표본 외 구간이 ${(P.oos_days / 252).toFixed(1)}년이고 성과의 상당 부분이 급락 구간(2020·2022·2026)에서 나옵니다. 독립 사례가 많지 않습니다.<br>
+      · 모형 10여 개와 목표 7개를 시험한 뒤 정리한 결과입니다. 개별 p값은 다중비교를 보정하지 않았습니다.<br>
+      · 지표는 <b>현재 시총 상위 1000종목</b> 기준이라 과거 구간은 살아남은 종목 위주(생존 편향)입니다. 과거의 수급 확산·섹터 이평선 값이 실제 그때 보였던 값과 다를 수 있습니다.<br>
+      · 급락장에서는 예상이 실제를 크게 밑돌았습니다(연도별 표).${cal == null ? "" : ` 전체 평균으로도 실제가 예상보다 ${cal.toFixed(0)}% 높게 나왔습니다.`}<br>
+      · 네이버 일봉을 최근 3,000거래일만 받아 쓰므로 학습 시작일이 매일 조금씩 밀립니다. 과거 값이 갱신 때마다 조금씩 달라질 수 있습니다.<br>
+      · ⑦ 시장 국면 점수와는 다른 점수입니다. ⑦은 참고 대시보드 방식 그대로이고, 위 방향 표 마지막 행처럼 같은 표본 외 구간으로 재보면 이후 수익률·변동성과의 관계가 약합니다.</div>`;
 }
 
 })();

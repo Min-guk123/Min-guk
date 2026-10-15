@@ -254,15 +254,24 @@ def main():
             SM.write(SM.compute(long[0], long[1], res["stock"], caps_actual=caps), os.path.join(BASE, "docs", "data", "sector_ma.json"))
         except Exception as e:  # noqa: BLE001
             print(f"[sector_ma] 섹터 이평선 위 비율 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
+        mp_payload = None
         try:  # 시장 국면 점수(⑦ 탭)
             import market_phase as MP
             op_path = args.op or local_cfg().get("op_path")
             pl = MP.run(long[0], long[1], res["stock"], caps, op_path, os.path.join(BASE, "data", "valuation_history.csv"),
                         os.path.join(BASE, "docs", "data", "market_phase.json"))
+            mp_payload = pl
             nw = pl["now"]
             print(f"[market_phase] {nw['date']} 국면 {pl['phases'][nw['phase'] - 1]['name'] if nw['phase'] else '-'} · 점수 {nw['score']} (낮음<{nw['lo']} 높음>{nw['hi']})")
         except Exception as e:  # noqa: BLE001
             print(f"[market_phase] 시장 국면 점수 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
+        try:  # 위험 예측 점수(⑧ 탭): 수급 확산 · 섹터 이평선 위 비율 · 최근 낙폭 평균으로 앞으로 20일 변동성 예측
+            import phase_model as RK
+            rk = RK.run(long[0], long[1], res["stock"], os.path.join(BASE, "docs", "data", "risk_score.json"), mp=mp_payload)
+            nr = rk["now"]
+            print(f"[risk_score] {nr['date']} 위험 {rk['level_defs'][nr['level']]['name']} · 점수 {nr['score']} · 예상 변동성 {nr['vol']}% (표본 외 R² {rk['ablation'][-1]['r2']})")
+        except Exception as e:  # noqa: BLE001
+            print(f"[risk_score] 위험 예측 점수 계산 실패(대시보드 나머지는 정상): {type(e).__name__}: {e}")
 
     try:  # 수급 확산 시그널(⑤ 탭). 실패해도 위 결과는 이미 저장됐으므로 계속 진행
         import signal_pipeline as SP
