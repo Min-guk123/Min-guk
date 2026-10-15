@@ -26,8 +26,18 @@ SETTLE_SEC = 20       # 마지막 변경 후 이만큼 조용하면 저장이 �
 PUBLISH = ["docs/data", "docs/downloads", "data/snapshots", "data/feature_history.csv", "data/valuation_history.csv"]
 
 
+LOGFILE = os.path.join(BASE, "data", "cache", "watcher.log")     # 백그라운드로 돌 때도 결과를 확인할 수 있게 파일로도 남김(git 제외)
+
+
 def log(msg):
-    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}", flush=True)
+    line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
+    print(line, flush=True)
+    try:
+        os.makedirs(os.path.dirname(LOGFILE), exist_ok=True)
+        with open(LOGFILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
 
 
 def run(cmd, check=True):
@@ -58,12 +68,16 @@ def update(path):
     log(f"계산 시작: {path}")
     run([sys.executable, os.path.join("scripts", "build.py"), "--source", "dataguide", "--file", path])
 
-    run(["git", "pull", "--rebase", "--autostash"], check=False)  # 서버(Actions)가 먼저 올린 커밋과 충돌 방지
     run(["git", "add"] + PUBLISH)
     if run(["git", "diff", "--cached", "--quiet"], check=False).returncode == 0:
         log("바뀐 내용이 없어 올리지 않았습니다.")
         return
     run(["git", "commit", "-m", f"엑셀 갱신 {datetime.now():%Y-%m-%d %H:%M}"])
+    # 서버(Actions)가 먼저 올린 커밋과 합친다. 올리는 파일은 매번 다시 만들어지는 생성 데이터라서
+    # 같은 파일이 충돌하면 이번에 엑셀로 만든 내 쪽 값을 쓴다(rebase 는 충돌하면 멈춰 커밋이 쌓이므로 merge 로).
+    r = run(["git", "pull", "--no-rebase", "-X", "ours", "--no-edit"], check=False)
+    if r.returncode != 0:
+        raise RuntimeError(f"원격과 합치지 못했습니다(코드 충돌 등, 직접 확인 필요):\n{r.stdout}\n{r.stderr}")
     run(["git", "push"])
     log("GitHub에 올렸습니다. 1~2분 뒤 사이트에 반영됩니다.")
 
