@@ -1087,7 +1087,7 @@ function buildSectorMa() {
   $("maState").innerHTML = `섹터 데이터 기준일 <b>${esc(SMA.asof)}</b> · 생성 ${esc(SMA.generated)} · 종목 ${SMA.n_stocks[0].toLocaleString()}개, 섹터 ${SMA.sectors.length - 1}개(3종목 이상) · 가격 이력 ${esc(SMA.history_start)}~`;
   $("maCtl").innerHTML = `<span>이동평균선</span><div class="seg" id="maMaSeg">${SMA.mas.map((m) => `<button data-k="${m.key}">${m.label}</button>`).join("")}</div>
     <span>기준</span><div class="seg" id="maBasisSeg"><button data-b="cnt">종목 수</button><button data-b="cap">시총 가중</button></div>
-    <span>차트 기간</span><div class="seg" id="maRangeSeg"><button data-r="63">3달</button><button data-r="126">6달</button><button data-r="252">1년</button><button data-r="all">전체</button></div>`;
+    <span>차트 기간</span><div class="seg" id="maRangeSeg"><button data-r="63">3달</button><button data-r="126">6달</button><button data-r="252">1년</button><button data-r="w156">3년(주간)</button><button data-r="all">전체</button></div>`;
   const bind = (id, attr, fn) => $(id).querySelectorAll("button").forEach((b) => { b.onclick = () => { fn(b.dataset[attr]); maRenderAll(); }; });
   bind("maMaSeg", "k", (v) => { maKey = v; store("maKey", v); });
   bind("maBasisSeg", "b", (v) => { maBasis = v; store("maBasis", v); });
@@ -1122,7 +1122,7 @@ function maRet() {
   $("maRetSeg").querySelectorAll("button").forEach((b) => { b.classList.toggle("on", b.dataset.h === maRetH); b.onclick = () => { maRetH = b.dataset.h; maRet(); }; });
 }
 function maTrend() {
-  const wk = maRange === "all", n = wk ? SMA.dates_w.length : Math.min(+maRange, SMA.dates_d.length);
+  const wk = maRange === "all" || String(maRange).startsWith("w"), n = maRange === "all" ? SMA.dates_w.length : wk ? Math.min(+String(maRange).slice(1), SMA.dates_w.length) : Math.min(+maRange, SMA.dates_d.length);
   const dates = (wk ? SMA.dates_w : SMA.dates_d).slice(-n);
   const get = (j) => maR(j, wk).slice(-n).map(maNz);
   const sel = [...maSel], series = [{ v: get(0), c: "#c9ccd1", w: 1.6, dash: "5 4" }];
