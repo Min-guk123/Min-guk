@@ -2,9 +2,9 @@ name: 코스닥 상대강도 일일 갱신
 
 on:
   schedule:
-    # 평일 16:20 KST (= 07:20 UTC). 장 마감(15:30) 뒤 종가가 확정된 다음 실행.
+    # 평일 13:00 KST (= 04:00 UTC). 장중이라 오늘 봉은 제외되고 전 거래일 종가까지 갱신됨(장 마감 후 값을 원하면 16:20 KST = "20 7 * * 1-5").
     # GitHub 예약 실행은 몰리는 시간에 10~30분 늦게 시작될 수 있음.
-    - cron: "20 7 * * 1-5"
+    - cron: "0 4 * * 1-5"
   workflow_dispatch: {}   # Actions 탭에서 'Run workflow'로 수동 실행
 
 permissions:
