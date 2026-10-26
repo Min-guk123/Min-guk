@@ -220,6 +220,8 @@ def main():
 
     res = E.compute(prices, index, universe, load_sector_map(), top_n=args.top)
     payload = to_json(res, src)
+    _fn = sys.modules.get("fetch_naver")
+    payload["intraday"] = bool(getattr(_fn, "INTRADAY_KEPT", False))      # 장중 현재가를 쓴 실행이면 화면에 표시
 
     os.makedirs(os.path.join(BASE, "docs", "data"), exist_ok=True)
     os.makedirs(os.path.join(BASE, "docs", "downloads"), exist_ok=True)

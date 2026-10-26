@@ -38,7 +38,7 @@
   </div>
 <script>
 fetch("data/latest.json", { cache: "no-store" }).then(r => r.json()).then(d => {
-  document.getElementById("upd").textContent = `데이터 기준일 ${d.asof} · 최종 갱신 ${d.generated}`;
+  document.getElementById("upd").textContent = `데이터 기준일 ${d.asof}${d.intraday ? " (장중 현재가, 마감 전)" : ""} · 최종 갱신 ${d.generated}`;
 }).catch(() => {});
 </script>
 </body>

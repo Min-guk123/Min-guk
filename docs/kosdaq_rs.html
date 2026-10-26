@@ -391,7 +391,8 @@ function init(data) {
   const ir = D.index_ret;
   $("updated").innerHTML = `데이터 기준일 <b>${esc(D.asof)}</b> · 생성 ${esc(D.generated)} · 코스닥 ${D.index_level.toLocaleString("ko-KR")} · `
     + `유니버스 <b>${D.universe_size.toLocaleString()}종목</b> (1000위 시총 ${fmt1(D.cutoff_mcap_bil)}십억원) · 출처 ${esc(D.source)}`
-    + (D.unclassified.length ? ` · <span class="pos">미분류 ${D.unclassified.length}종목</span>` : "");
+    + (D.unclassified.length ? ` · <span class="pos">미분류 ${D.unclassified.length}종목</span>` : "")
+    + (D.intraday ? ` · <span class="warn">장중 현재가 기준(마감 전 값, 16:20 이후 마감 값으로 바뀝니다)</span>` : "");
   // 요약표
   let h = '<tr><th class="lbl"></th>' + H.map((l) => `<th>${l}</th>`).join("") + "</tr>";
   h += '<tr><td class="lbl">코스닥 수익률</td>' + H.map((l) => `<td>${sgn(ir[l])}</td>`).join("") + "</tr>";

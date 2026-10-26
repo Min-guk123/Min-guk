@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import io
+import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -134,12 +135,18 @@ def daily_chart(symbol: str, count: int) -> pd.Series:
 
 
 KST = timezone(timedelta(hours=9))
+INTRADAY_KEPT = False      # 이번 실행에서 장중 현재가를 그대로 쓴 경우 True (build.py 가 화면에 표시)
 
 
 def _drop_open_session(s: pd.Series) -> pd.Series:
-    """장중(평일 15:40 KST 전)에 받으면 맨 끝 값이 '오늘 현재가'라서 마감 전 가격이 섞인다. 그 날짜 봉은 뺀다."""
+    """장중(평일 15:40 KST 전)에 받으면 맨 끝 값이 '오늘 현재가'라서 마감 전 가격이 섞인다. 기본은 그 날짜 봉을 뺀다.
+    환경변수 KQRS_INTRADAY=1 이면 장중 현재가를 그대로 쓴다(13:00 실행용, 마감 후 실행이 마감 값으로 덮어쓴다)."""
+    global INTRADAY_KEPT
     now = datetime.now(KST)
     if len(s) and now.weekday() < 5 and (now.hour, now.minute) < (15, 40) and s.index[-1].date() == now.date():
+        if os.environ.get("KQRS_INTRADAY") == "1":
+            INTRADAY_KEPT = True
+            return s
         return s.iloc[:-1]
     return s
 
